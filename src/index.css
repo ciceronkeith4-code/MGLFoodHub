@@ -1,0 +1,107 @@
+@import "tailwindcss";
+@import "react-day-picker/style.css";
+
+@theme {
+  --color-navy: #0d2b4e;
+  --color-navy-800: #12365f;
+  --color-navy-700: #1b4675;
+  --color-navy-50: #eef3f9;
+  --color-brand: #f7941d;
+  --color-brand-50: #fff4e6;
+  --color-brand-100: #ffe6c7;
+  --color-brand-600: #e57f07;
+  --color-brand-red: #e2382b;
+  --color-cream: #fbf4ea;
+  --color-sand: #f5e9d8;
+  --color-sand-200: #efdcc2;
+
+  --font-heading: "Poppins", "Montserrat", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Playfair Display", Georgia, "Times New Roman", serif;
+  --font-script: "Caveat", "Comic Sans MS", cursive;
+
+  --animate-fade-up: fade-up 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-pop: pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  --animate-dash: dash 1.2s linear infinite;
+
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes pop {
+    from { transform: scale(0.85); }
+    to { transform: scale(1); }
+  }
+  @keyframes dash {
+    from { transform: translateX(-30%); opacity: 0; }
+    50% { opacity: 1; }
+    to { transform: translateX(30%); opacity: 0; }
+  }
+}
+
+@utility bg-brand-gradient {
+  background-image: linear-gradient(135deg, #f7941d 0%, #e2382b 100%);
+}
+@utility text-brand-gradient {
+  background-image: linear-gradient(135deg, #f7941d 0%, #e2382b 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
+@layer base {
+  html { -webkit-tap-highlight-color: transparent; }
+  body {
+    @apply bg-cream text-navy font-sans antialiased;
+  }
+  h1, h2, h3, h4 {
+    font-family: var(--font-heading);
+    letter-spacing: -0.01em;
+  }
+  button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
+  input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+}
+
+@keyframes sheet-in {
+  from { transform: translateX(100%); }
+  to { transform: none; }
+}
+
+.rdp-root {
+  --rdp-accent-color: #f7941d;
+  --rdp-accent-background-color: #fff4e6;
+  --rdp-today-color: #0d2b4e;
+  /* Shrinks on narrow phones so 7 columns always fit (min 32px tap target). */
+  --rdp-day-width: clamp(32px, calc((100vw - 104px) / 7), 40px);
+  --rdp-day-height: clamp(32px, calc((100vw - 104px) / 7), 40px);
+  --rdp-day_button-width: calc(var(--rdp-day-width) - 2px);
+  --rdp-day_button-height: calc(var(--rdp-day-height) - 2px);
+  --rdp-nav-height: 2.5rem;
+  max-width: 100%;
+  --rdp-selected-border: 2px solid #f7941d;
+}
+.rdp-selected .rdp-day_button {
+  background: linear-gradient(135deg, #f7941d, #e2382b);
+  color: white;
+  font-weight: 700;
+  border: none;
+}
+.rdp-disabled { opacity: 0.35; }
+.rdp-disabled .rdp-day_button { text-decoration: line-through; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: white; }
+  .print-break { break-inside: avoid; }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "MGL Food Hub",
+  "short_name": "MGL Food Hub",
+  "description": "Order from 13 Malabon favorites in one cart. Scheduled delivery.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFF9F3",
+  "theme_color": "#0D2B4E",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

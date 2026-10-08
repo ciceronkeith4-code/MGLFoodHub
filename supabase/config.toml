@@ -1,0 +1,10 @@
+# Minimal Supabase CLI config (supabase link / db push / functions deploy).
+project_id = "mgl-food-hub"
+
+[auth]
+# Customers never log in; admins are created manually in the dashboard.
+enable_signup = false
+
+[functions.send-order-email]
+# Called anonymously from checkout; the function validates the token itself.
+verify_jwt = false
