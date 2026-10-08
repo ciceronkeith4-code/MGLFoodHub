@@ -40,14 +40,14 @@ export function formatTime(t: string): string {
 }
 
 export function formatHours(open: string, close: string): string {
-  return `${formatTime(open)} – ${formatTime(close)}`
+  return `${formatTime(open)} to ${formatTime(close)}`
 }
 
 /** "11:00-12:00" → "11:00 AM – 12:00 PM" */
 export function slotLabel(slot: string): string {
   const [a, b] = slot.split('-')
   if (!a || !b) return slot
-  return `${formatTime(a)} – ${formatTime(b)}`
+  return `${formatTime(a)} to ${formatTime(b)}`
 }
 
 /** Current date ("YYYY-MM-DD") and minutes-of-day in Manila. */
@@ -136,7 +136,7 @@ export function normalizePhone(raw: string): string | null {
 /** "09171234567" → "0917-123-4567" */
 export function formatPhone(p: string): string {
   const n = normalizePhone(p) ?? p
-  return /^09\d{9}$/.test(n) ? `${n.slice(0, 4)}-${n.slice(4, 7)}-${n.slice(7)}` : p
+  return /^09\d{9}$/.test(n) ? `${n.slice(0, 4)} ${n.slice(4, 7)} ${n.slice(7)}` : p
 }
 
 export const isValidEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e.trim())

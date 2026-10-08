@@ -128,7 +128,7 @@ export default function PrepList() {
         </label>
       </div>
 
-      <h2 className="mb-3 hidden font-heading text-xl font-bold print:block">MGL Food Hub — Prep list for {formatDate(date, 'long')}</h2>
+      <h2 className="mb-3 hidden font-heading text-xl font-bold print:block">MGL Food Hub · Prep list for {formatDate(date, 'long')}</h2>
 
       {error && <ErrorBanner>{error}</ErrorBanner>}
       {!rows ? (
@@ -158,7 +158,7 @@ export default function PrepList() {
                       <td className="px-4 py-2">
                         <p className="font-semibold">
                           {l.product}
-                          {l.variant !== 'Regular' && <span className="font-normal"> — {l.variant}</span>}
+                          {l.variant !== 'Regular' && <span className="font-normal"> · {l.variant}</span>}
                         </p>
                         <p className="text-xs text-navy/55">{[l.section !== l.product ? l.section : '', l.options].filter(Boolean).join(' · ')}</p>
                       </td>

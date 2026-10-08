@@ -22,7 +22,7 @@ export default function StorePage() {
   useEffect(() => {
     if (store) document.title = `${store.name} · MGL Food Hub`
     return () => {
-      document.title = 'MGL Food Hub — Scheduled Food Delivery'
+      document.title = 'MGL Food Hub · Scheduled Food Delivery'
     }
   }, [store])
 
@@ -187,7 +187,7 @@ export default function StorePage() {
         <Disclaimer />
       </div>
 
-      <Lightbox open={menuOpen} onOpenChange={setMenuOpen} src={store.menu_image_url} title={`${store.name} — original menu`} />
+      <Lightbox open={menuOpen} onOpenChange={setMenuOpen} src={store.menu_image_url} title={`${store.name} · Original menu`} />
     </div>
   )
 }

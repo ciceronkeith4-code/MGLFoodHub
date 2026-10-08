@@ -79,6 +79,23 @@ export function parseMenu() {
 const q = (v) => (v === null || v === undefined ? 'null' : `'${String(v).replace(/'/g, "''")}'`)
 const money = (n) => (n === null ? 'null' : n.toFixed(2))
 
+// Display order of the stores (stores.sort). Unlisted stores follow in menu order.
+const STORE_ORDER = [
+  'sisig-ni-mutik',
+  'judy-anns-crispy-pata',
+  'hazels-special-puto',
+  'okoy-ni-jay-r',
+  'aurings-special-pancit-malabon',
+  'normas-special-pancit-bilao',
+  'balsa-sa-niugan',
+  'original-benjie-puto-pao',
+  'mary-jay',
+  'rody-days',
+  'anny-dading-peachy-peachy',
+  'aling-melys-carinderia',
+  'raves-diner',
+]
+
 export function buildSeed(stores) {
   const out = []
   out.push('-- =====================================================================')
@@ -95,7 +112,8 @@ export function buildSeed(stores) {
   out.push('')
 
   const rows = { stores: [], sections: [], products: [], variants: [], groups: [], choices: [] }
-  stores.forEach((s, si) => {
+  stores.forEach((s, i) => {
+    const si = STORE_ORDER.includes(s.slug) ? STORE_ORDER.indexOf(s.slug) : STORE_ORDER.length + i
     const storeId = uid(`store:${s.slug}`)
     const img = `/menus/${s.slug}.jpg`
     rows.stores.push(
@@ -127,18 +145,20 @@ export function buildSeed(stores) {
     })
   })
 
-  const block = (table, cols, list) => {
+  const block = (table, cols, list, onConflict = 'do nothing') => {
     out.push(`insert into public.${table} (${cols}) values`)
-    out.push(list.join(',\n') + '\non conflict (id) do nothing;')
+    out.push(list.join(',\n') + `\non conflict (id) ${onConflict};`)
     out.push('')
   }
   block(
     'stores',
     'id, slug, name, tagline, hub_category_id, open_time, close_time, address, contact_note, cover_image_url, menu_image_url, is_accepting_orders, sort',
     rows.stores,
+    // Re-running the setup applies the display order and taglines to an existing database.
+    'do update set sort = excluded.sort, tagline = excluded.tagline',
   )
   block('menu_sections', 'id, store_id, name, note, sort', rows.sections)
-  block('products', 'id, store_id, section_id, name, description, badge, sort', rows.products)
+  block('products', 'id, store_id, section_id, name, description, badge, sort', rows.products, 'do update set name = excluded.name')
   block('product_variants', 'id, product_id, label, price, addon_price, sort', rows.variants)
   block('option_groups', 'id, product_id, name, is_required', rows.groups)
   block('option_choices', 'id, group_id, label, price_delta, sort', rows.choices)

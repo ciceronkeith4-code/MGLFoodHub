@@ -51,7 +51,7 @@ Admins can also replace any store cover, menu photo or product photo from **Admi
 
 ## 4. Admin settings to fill in first
 
-**Admin → Settings**: GCash account name, number and QR image; cutoff time (default 8:00 PM); max days ahead (default 30); blocked dates; email toggle.
+**Admin → Settings**: account name, number and QR image for GCash, MariBank and GoTyme (each works the same way: the customer pays, then sends the reference number and a screenshot); cutoff time (default 8:00 PM); max days ahead (default 30); blocked dates; email toggle.
 
 ## 5. Prices (fixed)
 

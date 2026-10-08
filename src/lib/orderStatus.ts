@@ -1,4 +1,4 @@
-import type { OrderStatus, PaymentMethod, PaymentStatus, PublicOrder } from './types'
+import type { CheckoutInfo, OnlineMethod, OrderStatus, PaymentAccount, PaymentMethod, PaymentStatus, PublicOrder } from './types'
 import { formatDate, formatPhone, peso } from './utils'
 
 export type Tone = 'info' | 'success' | 'warning' | 'danger' | 'neutral'
@@ -13,15 +13,37 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
 }
 
 export const PAYMENT_STATUS_LABEL: Record<PaymentStatus, string> = {
-  cod_unpaid: 'COD – unpaid',
-  pending_verification: 'GCash – to verify',
+  cod_unpaid: 'COD unpaid',
+  pending_verification: 'Payment to verify',
   paid: 'Paid',
-  rejected: 'GCash – rejected',
+  rejected: 'Payment rejected',
 }
 
 export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
   cod: 'Cash on Delivery',
   gcash: 'GCash',
+  maribank: 'MariBank',
+  gotyme: 'GoTyme',
+}
+
+/** Online payment methods, in the order they are shown at checkout. */
+export const ONLINE_METHODS: OnlineMethod[] = ['gcash', 'maribank', 'gotyme']
+
+export const isOnline = (m: PaymentMethod): m is OnlineMethod => m !== 'cod'
+
+/** Official logos (public/payments). */
+export const PAYMENT_LOGO: Record<OnlineMethod, string> = {
+  gcash: '/payments/gcash.png',
+  maribank: '/payments/maribank.png',
+  gotyme: '/payments/gotyme.svg',
+}
+
+/** Account name / number / QR for an online method (falls back to the old GCash fields). */
+export function paymentAccount(info: CheckoutInfo | null | undefined, m: OnlineMethod): PaymentAccount {
+  const a = info?.payment_accounts?.[m]
+  if (a) return a
+  if (m === 'gcash' && info) return { account_name: info.gcash_account_name, number: info.gcash_number, qr_url: info.gcash_qr_url }
+  return { account_name: '', number: '', qr_url: '' }
 }
 
 export const ORDER_STATUS_TONE: Record<OrderStatus, Tone> = {
@@ -44,7 +66,7 @@ export const PAYMENT_STATUS_TONE: Record<PaymentStatus, Tone> = {
 export function historyLabel(status: string, method: PaymentMethod): string {
   switch (status) {
     case 'processing':
-      return method === 'gcash' ? 'Processing Payment' : 'Order Processed'
+      return isOnline(method) ? 'Processing Payment' : 'Order Processed'
     case 'confirmed':
       return 'Confirmed'
     case 'payment_confirmed':
@@ -106,23 +128,24 @@ export function customerStatus(o: PublicOrder): StatusMessage {
     }
   }
 
-  // GCash
+  // Online payment (GCash, MariBank, GoTyme)
+  const label = PAYMENT_METHOD_LABEL[o.payment_method]
   switch (o.order_status) {
     case 'processing':
       if (o.payment_status === 'rejected') {
         return {
           title: 'Payment Rejected ❌',
-          message: o.payment_rejection_reason || 'We could not verify your GCash payment. Please upload a new proof.',
+          message: o.payment_rejection_reason || `We could not verify your ${label} payment. Please upload a new proof.`,
           tone: 'danger',
         }
       }
       return {
         title: 'Processing Payment ⏳',
-        message: `We are verifying your GCash payment (Ref: ${o.gcash_reference ?? '—'}).`,
+        message: o.gcash_reference ? `We are verifying your ${label} payment (Ref: ${o.gcash_reference}).` : `We are verifying your ${label} payment.`,
         tone: 'warning',
       }
     case 'confirmed':
-      return { title: 'Payment Confirmed ✅', message: 'Thank you! Your GCash payment is verified and your order is confirmed.', tone: 'success' }
+      return { title: 'Payment Confirmed ✅', message: `Thank you! Your ${label} payment is verified and your order is confirmed.`, tone: 'success' }
     case 'preparing':
       return { title: 'Preparing', message: `The stores are preparing your order for ${formatDate(o.delivery_date)}.`, tone: 'info' }
     case 'out_for_delivery':
@@ -160,7 +183,7 @@ const RANK: Record<OrderStatus, number> = {
 /** Five-step progress tracker for the tracking page. */
 export function progressSteps(o: PublicOrder): Step[] {
   const keys =
-    o.payment_method === 'gcash'
+    isOnline(o.payment_method)
       ? ['processing', 'payment_confirmed', 'preparing', 'out_for_delivery', 'delivered']
       : ['processing', 'confirmed', 'preparing', 'out_for_delivery', 'delivered']
   const rank = RANK[o.order_status]

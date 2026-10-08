@@ -6,7 +6,7 @@ import { Badge } from './ui/badge'
 import type { Tone } from '@/lib/orderStatus'
 
 export const DELIVERY_DISCLAIMER =
-  'Menu prices are VAT inclusive and may vary or be subject to change by the merchant. Higher delivery fees may also apply for long distance deliveries. For long-distance deliveries, please be reminded that the quality of some food items may not be the same as in-store quality.'
+  'Menu prices are VAT inclusive and may vary or be subject to change by the merchant. Higher delivery fees may also apply for long distance deliveries. For long distance deliveries, please be reminded that the quality of some food items may not be the same as in store quality.'
 
 export function Disclaimer({ className }: { className?: string }) {
   return (
@@ -22,7 +22,7 @@ export function ScheduledNotice({ className }: { className?: string }) {
     <div className={cn('flex items-center justify-center gap-2 bg-navy px-4 py-2 text-center text-xs font-medium text-white sm:text-sm', className)}>
       <span aria-hidden>🗓️</span>
       <span>
-        All orders are <strong className="text-brand">scheduled</strong>. Same-day delivery is not available.
+        All orders are <strong className="text-brand">scheduled</strong>. Same day delivery is not available.
       </span>
     </div>
   )
@@ -162,7 +162,7 @@ export function ToneBadge({ tone, children, className }: { tone: Tone; children:
 export const BADGE_LABEL: Record<string, string> = {
   best_seller: '🔥 Best Seller',
   new: '✨ New',
-  all_time_favorite: '❤️ All-time Favorite',
+  all_time_favorite: '❤️ All Time Favorite',
 }
 
 export function ProductBadge({ badge }: { badge: string | null }) {

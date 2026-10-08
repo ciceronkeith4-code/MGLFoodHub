@@ -34,7 +34,7 @@ const slotLabel = (slot: string) =>
       const [h, m] = t.split(':').map(Number)
       return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`
     })
-    .join(' – ')
+    .join(' to ')
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
     <p style="margin:8px 0 0;font-size:12px;word-break:break-all;color:#6b7280">${link}</p>
   </div>
   <p style="margin:0 0 4px"><strong>Delivery:</strong> ${esc(date)}, ${esc(slotLabel(order.delivery_slot))}</p>
-  <p style="margin:0 0 16px"><strong>Payment:</strong> ${order.payment_method === 'gcash' ? 'GCash' : 'Cash on Delivery'}</p>
+  <p style="margin:0 0 16px"><strong>Payment:</strong> ${({ cod: 'Cash on Delivery', gcash: 'GCash', maribank: 'MariBank', gotyme: 'GoTyme' } as Record<string, string>)[order.payment_method] ?? order.payment_method}</p>
   <table style="width:100%;border-collapse:collapse;font-size:14px">${rows}
     <tr><td style="padding:8px 0;font-weight:700">Food subtotal</td><td style="padding:8px 0;text-align:right;font-weight:700">${peso(order.subtotal)}</td></tr>
   </table>

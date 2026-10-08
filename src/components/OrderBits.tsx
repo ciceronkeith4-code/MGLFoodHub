@@ -37,7 +37,7 @@ export function TrackingLinkActions({ url, orderNumber, showQr = true }: { url: 
                 /* cancelled */
               }
             } else if (await copyText(url)) {
-              toast.success('Link copied — paste it in Messenger, Viber or SMS.')
+              toast.success('Link copied. Paste it in Messenger, Viber or SMS.')
             }
           }}
         >

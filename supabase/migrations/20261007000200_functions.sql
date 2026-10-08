@@ -109,6 +109,21 @@ begin
   end if;
 end $$;
 
+-- Display name of a payment method (used in customer-visible notes).
+create or replace function public.payment_label(p_method text)
+returns text
+language sql
+immutable
+as $$
+  select case p_method
+    when 'gcash' then 'GCash'
+    when 'maribank' then 'MariBank'
+    when 'gotyme' then 'GoTyme'
+    when 'cod' then 'Cash on Delivery'
+    else p_method
+  end;
+$$;
+
 create or replace function public.proof_exists(p_path text)
 returns boolean
 language sql
@@ -145,6 +160,14 @@ begin
     'gcash_account_name', coalesce(public.setting('gcash_account_name') #>> '{}', ''),
     'gcash_number', coalesce(public.setting('gcash_number') #>> '{}', ''),
     'gcash_qr_url', coalesce(public.setting('gcash_qr_url') #>> '{}', ''),
+    'payment_accounts', (
+      select jsonb_object_agg(m, jsonb_build_object(
+        'account_name', coalesce(public.setting(m || '_account_name') #>> '{}', ''),
+        'number', coalesce(public.setting(m || '_number') #>> '{}', ''),
+        'qr_url', coalesce(public.setting(m || '_qr_url') #>> '{}', '')
+      ))
+      from unnest(array['gcash', 'maribank', 'gotyme']) as m
+    ),
     'delivery_fee_note', coalesce(public.setting('delivery_fee_note') #>> '{}', ''),
     'email_notifications_enabled', coalesce((public.setting('email_notifications_enabled') #>> '{}')::boolean, false),
     'ordering_guidelines', coalesce(public.setting('ordering_guidelines'), '[]'::jsonb)
@@ -234,15 +257,16 @@ begin
   end if;
 
   -- Payment
-  if v_method_text not in ('cod', 'gcash') or v_method_text is null then
+  if v_method_text is null or v_method_text not in ('cod', 'gcash', 'maribank', 'gotyme') then
     raise exception 'Please choose a payment method.';
   end if;
-  if v_method_text = 'gcash' then
+  -- GCash, MariBank and GoTyme all work the same way: reference number + screenshot.
+  if v_method_text <> 'cod' then
     if v_ref is null or v_ref !~ '^[A-Z0-9-]{4,40}$' then
-      raise exception 'Please enter your GCash reference number.';
+      raise exception 'Please enter your % reference number.', public.payment_label(v_method_text);
     end if;
     if v_proof is null or v_proof !~ '^proofs/[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+$' or not public.proof_exists(v_proof) then
-      raise exception 'Please upload a screenshot of your GCash payment.';
+      raise exception 'Please upload a screenshot of your % payment.', public.payment_label(v_method_text);
     end if;
   else
     v_ref := null;
@@ -256,7 +280,7 @@ begin
   end if;
   v_date := (payload->>'delivery_date')::date;
   if v_date <= w.today then
-    raise exception 'Same-day delivery is not available. Please choose a future delivery date.';
+    raise exception 'Same day delivery is not available. Please choose a future delivery date.';
   end if;
   if v_date < w.min_date then
     raise exception 'The cutoff for % deliveries has passed (% PH time). The earliest available date is %.',
@@ -403,7 +427,7 @@ begin
   v_slot_end := split_part(v_slot, '-', 2)::time;
 
   select max(open_time), min(close_time),
-         string_agg(name || ' (' || to_char(open_time, 'FMHH12:MI AM') || '–' || to_char(close_time, 'FMHH12:MI AM') || ')', ', ' order by name)
+         string_agg(name || ' (' || to_char(open_time, 'FMHH12:MI AM') || ' to ' || to_char(close_time, 'FMHH12:MI AM') || ')', ', ' order by name)
     into v_max_open, v_min_close, v_hours
   from public.stores where id = any(v_store_ids);
 
@@ -435,7 +459,7 @@ begin
   ) values (
     v_order_id, v_order_number, v_token, v_device, v_name, v_phone, v_email, v_social,
     v_address, v_barangay, v_city, v_landmark, v_date, v_slot, v_method_text::public.payment_method,
-    case when v_method_text = 'gcash' then 'pending_verification' else 'cod_unpaid' end::public.payment_status,
+    case when v_method_text = 'cod' then 'cod_unpaid' else 'pending_verification' end::public.payment_status,
     'processing', v_ref, v_proof, v_subtotal, 0, v_subtotal, v_notes
   );
 
@@ -453,8 +477,8 @@ begin
   insert into public.order_status_history (order_id, status, note)
   values (
     v_order_id, 'processing',
-    case when v_method_text = 'gcash'
-      then 'GCash payment submitted for verification (Ref: ' || v_ref || ').'
+    case when v_method_text <> 'cod'
+      then public.payment_label(v_method_text) || ' payment submitted for verification (Ref: ' || v_ref || ').'
       else 'Order received. Our team will call you to confirm.'
     end
   );
@@ -605,14 +629,14 @@ begin
   if not found then
     raise exception 'Order not found.';
   end if;
-  if o.payment_method <> 'gcash' or o.payment_status <> 'rejected' or o.order_status <> 'processing' then
+  if o.payment_method = 'cod' or o.payment_status <> 'rejected' or o.order_status <> 'processing' then
     raise exception 'This order is not waiting for a new payment proof.';
   end if;
   if v_ref is null or v_ref !~ '^[A-Z0-9-]{4,40}$' then
-    raise exception 'Please enter your GCash reference number.';
+    raise exception 'Please enter your % reference number.', public.payment_label(o.payment_method::text);
   end if;
   if p_path is null or p_path !~ '^proofs/[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+$' or not public.proof_exists(p_path) then
-    raise exception 'Please upload a screenshot of your GCash payment.';
+    raise exception 'Please upload a screenshot of your % payment.', public.payment_label(o.payment_method::text);
   end if;
 
   update public.orders
@@ -622,7 +646,7 @@ begin
          payment_rejection_reason = null
    where id = o.id;
   insert into public.order_status_history (order_id, status, note)
-  values (o.id, 'proof_resubmitted', 'New GCash payment proof submitted (Ref: ' || v_ref || ').');
+  values (o.id, 'proof_resubmitted', 'New ' || public.payment_label(o.payment_method::text) || ' payment proof submitted (Ref: ' || v_ref || ').');
 end $$;
 
 -- ---------------------------------------------------------------------
@@ -658,22 +682,22 @@ begin
   end if;
 
   case p_action
-    -- "Confirm Order" works for both payment methods. For GCash it also
-    -- verifies the payment (same result as mark_paid).
+    -- "Confirm Order" works for every payment method. For online payments
+    -- (GCash, MariBank, GoTyme) it also verifies the payment (same as mark_paid).
     when 'confirm' then
       if o.order_status <> 'processing' then
         raise exception 'Only orders awaiting confirmation can be confirmed.';
       end if;
-      if o.payment_method = 'gcash' then
+      if o.payment_method <> 'cod' then
         if o.payment_status not in ('pending_verification', 'rejected') then
-          raise exception 'This GCash order has no payment waiting for verification.';
+          raise exception 'This % order has no payment waiting for verification.', public.payment_label(o.payment_method::text);
         end if;
         update public.orders
            set payment_status = 'paid', order_status = 'confirmed', payment_rejection_reason = null,
                cancel_requested = false
          where id = o.id;
         v_status := 'payment_confirmed';
-        v_note := coalesce(v_note, 'GCash payment verified. Your order is confirmed.');
+        v_note := coalesce(v_note, public.payment_label(o.payment_method::text) || ' payment verified. Your order is confirmed.');
       else
         update public.orders set order_status = 'confirmed', cancel_requested = false where id = o.id;
         v_status := 'confirmed';
@@ -681,20 +705,20 @@ begin
       end if;
 
     when 'mark_paid' then
-      if o.payment_method <> 'gcash' or o.payment_status not in ('pending_verification', 'rejected')
+      if o.payment_method = 'cod' or o.payment_status not in ('pending_verification', 'rejected')
          or o.order_status <> 'processing' then
-        raise exception 'This order has no GCash payment waiting for verification.';
+        raise exception 'This order has no online payment waiting for verification.';
       end if;
       update public.orders
          set payment_status = 'paid', order_status = 'confirmed', payment_rejection_reason = null,
              cancel_requested = false
        where id = o.id;
       v_status := 'payment_confirmed';
-      v_note := coalesce(v_note, 'GCash payment verified.');
+      v_note := coalesce(v_note, public.payment_label(o.payment_method::text) || ' payment verified.');
 
     when 'reject_payment' then
-      if o.payment_method <> 'gcash' or o.payment_status <> 'pending_verification' or o.order_status <> 'processing' then
-        raise exception 'This order has no GCash payment waiting for verification.';
+      if o.payment_method = 'cod' or o.payment_status <> 'pending_verification' or o.order_status <> 'processing' then
+        raise exception 'This order has no online payment waiting for verification.';
       end if;
       if v_note is null then
         raise exception 'A reason is required to reject a payment.';

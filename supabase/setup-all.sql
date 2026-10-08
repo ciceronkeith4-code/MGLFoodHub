@@ -14,8 +14,11 @@ create extension if not exists pgcrypto with schema extensions;
 -- Enums
 -- ---------------------------------------------------------------------
 do $$ begin
-  create type public.payment_method as enum ('cod', 'gcash');
+  create type public.payment_method as enum ('cod', 'gcash', 'maribank', 'gotyme');
 exception when duplicate_object then null; end $$;
+-- Databases created before MariBank and GoTyme were added.
+alter type public.payment_method add value if not exists 'maribank';
+alter type public.payment_method add value if not exists 'gotyme';
 
 do $$ begin
   create type public.payment_status as enum ('cod_unpaid', 'pending_verification', 'paid', 'rejected');
@@ -202,6 +205,12 @@ insert into public.settings (key, value) values
   ('gcash_account_name', '""'::jsonb),
   ('gcash_number', '""'::jsonb),
   ('gcash_qr_url', '""'::jsonb),
+  ('maribank_account_name', '""'::jsonb),
+  ('maribank_number', '""'::jsonb),
+  ('maribank_qr_url', '""'::jsonb),
+  ('gotyme_account_name', '""'::jsonb),
+  ('gotyme_number', '""'::jsonb),
+  ('gotyme_qr_url', '""'::jsonb),
   ('cutoff_time', '"20:00"'::jsonb),
   ('max_days_ahead', '30'::jsonb),
   ('blocked_dates', '[]'::jsonb),
@@ -210,13 +219,23 @@ insert into public.settings (key, value) values
   ('max_orders_per_phone_per_day', '5'::jsonb),
   ('ordering_guidelines', jsonb_build_array(
     'We deliver via Grab within Metro Manila from 12:00 PM to 6:00 PM.',
-    'Pay by Cash on Delivery (COD) or online (GCash).',
-    'Orders are for booking (scheduled delivery) only. Same-day delivery is not available.',
+    'Pay by Cash on Delivery (COD) or online via GCash, MariBank or GoTyme.',
+    'Orders are for booking (scheduled delivery) only. Same day delivery is not available.',
     'We will confirm your order by text or call.',
     'Menu prices are VAT inclusive and may vary or be subject to change by the merchant. Higher delivery fees may also apply for long distance deliveries.',
     'You can order from all merchants in the app and pay only one delivery fee.'
   ))
 on conflict (key) do nothing;
+
+-- Existing databases: update the two default guidelines that changed (custom ones are kept).
+update public.settings
+   set value = (
+     select coalesce(jsonb_agg(case g
+         when 'Pay by Cash on Delivery (COD) or online (GCash).' then 'Pay by Cash on Delivery (COD) or online via GCash, MariBank or GoTyme.'
+         when 'Orders are for booking (scheduled delivery) only. Same-day delivery is not available.' then 'Orders are for booking (scheduled delivery) only. Same day delivery is not available.'
+         else g end order by n), '[]'::jsonb)
+     from jsonb_array_elements_text(value) with ordinality as t(g, n))
+ where key = 'ordering_guidelines' and jsonb_typeof(value) = 'array';
 
 -- ---------------------------------------------------------------------
 -- Helpers
@@ -513,6 +532,21 @@ begin
   end if;
 end $$;
 
+-- Display name of a payment method (used in customer-visible notes).
+create or replace function public.payment_label(p_method text)
+returns text
+language sql
+immutable
+as $$
+  select case p_method
+    when 'gcash' then 'GCash'
+    when 'maribank' then 'MariBank'
+    when 'gotyme' then 'GoTyme'
+    when 'cod' then 'Cash on Delivery'
+    else p_method
+  end;
+$$;
+
 create or replace function public.proof_exists(p_path text)
 returns boolean
 language sql
@@ -549,6 +583,14 @@ begin
     'gcash_account_name', coalesce(public.setting('gcash_account_name') #>> '{}', ''),
     'gcash_number', coalesce(public.setting('gcash_number') #>> '{}', ''),
     'gcash_qr_url', coalesce(public.setting('gcash_qr_url') #>> '{}', ''),
+    'payment_accounts', (
+      select jsonb_object_agg(m, jsonb_build_object(
+        'account_name', coalesce(public.setting(m || '_account_name') #>> '{}', ''),
+        'number', coalesce(public.setting(m || '_number') #>> '{}', ''),
+        'qr_url', coalesce(public.setting(m || '_qr_url') #>> '{}', '')
+      ))
+      from unnest(array['gcash', 'maribank', 'gotyme']) as m
+    ),
     'delivery_fee_note', coalesce(public.setting('delivery_fee_note') #>> '{}', ''),
     'email_notifications_enabled', coalesce((public.setting('email_notifications_enabled') #>> '{}')::boolean, false),
     'ordering_guidelines', coalesce(public.setting('ordering_guidelines'), '[]'::jsonb)
@@ -638,15 +680,16 @@ begin
   end if;
 
   -- Payment
-  if v_method_text not in ('cod', 'gcash') or v_method_text is null then
+  if v_method_text is null or v_method_text not in ('cod', 'gcash', 'maribank', 'gotyme') then
     raise exception 'Please choose a payment method.';
   end if;
-  if v_method_text = 'gcash' then
+  -- GCash, MariBank and GoTyme all work the same way: reference number + screenshot.
+  if v_method_text <> 'cod' then
     if v_ref is null or v_ref !~ '^[A-Z0-9-]{4,40}$' then
-      raise exception 'Please enter your GCash reference number.';
+      raise exception 'Please enter your % reference number.', public.payment_label(v_method_text);
     end if;
     if v_proof is null or v_proof !~ '^proofs/[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+$' or not public.proof_exists(v_proof) then
-      raise exception 'Please upload a screenshot of your GCash payment.';
+      raise exception 'Please upload a screenshot of your % payment.', public.payment_label(v_method_text);
     end if;
   else
     v_ref := null;
@@ -660,7 +703,7 @@ begin
   end if;
   v_date := (payload->>'delivery_date')::date;
   if v_date <= w.today then
-    raise exception 'Same-day delivery is not available. Please choose a future delivery date.';
+    raise exception 'Same day delivery is not available. Please choose a future delivery date.';
   end if;
   if v_date < w.min_date then
     raise exception 'The cutoff for % deliveries has passed (% PH time). The earliest available date is %.',
@@ -807,7 +850,7 @@ begin
   v_slot_end := split_part(v_slot, '-', 2)::time;
 
   select max(open_time), min(close_time),
-         string_agg(name || ' (' || to_char(open_time, 'FMHH12:MI AM') || '–' || to_char(close_time, 'FMHH12:MI AM') || ')', ', ' order by name)
+         string_agg(name || ' (' || to_char(open_time, 'FMHH12:MI AM') || ' to ' || to_char(close_time, 'FMHH12:MI AM') || ')', ', ' order by name)
     into v_max_open, v_min_close, v_hours
   from public.stores where id = any(v_store_ids);
 
@@ -839,7 +882,7 @@ begin
   ) values (
     v_order_id, v_order_number, v_token, v_device, v_name, v_phone, v_email, v_social,
     v_address, v_barangay, v_city, v_landmark, v_date, v_slot, v_method_text::public.payment_method,
-    case when v_method_text = 'gcash' then 'pending_verification' else 'cod_unpaid' end::public.payment_status,
+    case when v_method_text = 'cod' then 'cod_unpaid' else 'pending_verification' end::public.payment_status,
     'processing', v_ref, v_proof, v_subtotal, 0, v_subtotal, v_notes
   );
 
@@ -857,8 +900,8 @@ begin
   insert into public.order_status_history (order_id, status, note)
   values (
     v_order_id, 'processing',
-    case when v_method_text = 'gcash'
-      then 'GCash payment submitted for verification (Ref: ' || v_ref || ').'
+    case when v_method_text <> 'cod'
+      then public.payment_label(v_method_text) || ' payment submitted for verification (Ref: ' || v_ref || ').'
       else 'Order received. Our team will call you to confirm.'
     end
   );
@@ -1009,14 +1052,14 @@ begin
   if not found then
     raise exception 'Order not found.';
   end if;
-  if o.payment_method <> 'gcash' or o.payment_status <> 'rejected' or o.order_status <> 'processing' then
+  if o.payment_method = 'cod' or o.payment_status <> 'rejected' or o.order_status <> 'processing' then
     raise exception 'This order is not waiting for a new payment proof.';
   end if;
   if v_ref is null or v_ref !~ '^[A-Z0-9-]{4,40}$' then
-    raise exception 'Please enter your GCash reference number.';
+    raise exception 'Please enter your % reference number.', public.payment_label(o.payment_method::text);
   end if;
   if p_path is null or p_path !~ '^proofs/[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+$' or not public.proof_exists(p_path) then
-    raise exception 'Please upload a screenshot of your GCash payment.';
+    raise exception 'Please upload a screenshot of your % payment.', public.payment_label(o.payment_method::text);
   end if;
 
   update public.orders
@@ -1026,7 +1069,7 @@ begin
          payment_rejection_reason = null
    where id = o.id;
   insert into public.order_status_history (order_id, status, note)
-  values (o.id, 'proof_resubmitted', 'New GCash payment proof submitted (Ref: ' || v_ref || ').');
+  values (o.id, 'proof_resubmitted', 'New ' || public.payment_label(o.payment_method::text) || ' payment proof submitted (Ref: ' || v_ref || ').');
 end $$;
 
 -- ---------------------------------------------------------------------
@@ -1062,22 +1105,22 @@ begin
   end if;
 
   case p_action
-    -- "Confirm Order" works for both payment methods. For GCash it also
-    -- verifies the payment (same result as mark_paid).
+    -- "Confirm Order" works for every payment method. For online payments
+    -- (GCash, MariBank, GoTyme) it also verifies the payment (same as mark_paid).
     when 'confirm' then
       if o.order_status <> 'processing' then
         raise exception 'Only orders awaiting confirmation can be confirmed.';
       end if;
-      if o.payment_method = 'gcash' then
+      if o.payment_method <> 'cod' then
         if o.payment_status not in ('pending_verification', 'rejected') then
-          raise exception 'This GCash order has no payment waiting for verification.';
+          raise exception 'This % order has no payment waiting for verification.', public.payment_label(o.payment_method::text);
         end if;
         update public.orders
            set payment_status = 'paid', order_status = 'confirmed', payment_rejection_reason = null,
                cancel_requested = false
          where id = o.id;
         v_status := 'payment_confirmed';
-        v_note := coalesce(v_note, 'GCash payment verified. Your order is confirmed.');
+        v_note := coalesce(v_note, public.payment_label(o.payment_method::text) || ' payment verified. Your order is confirmed.');
       else
         update public.orders set order_status = 'confirmed', cancel_requested = false where id = o.id;
         v_status := 'confirmed';
@@ -1085,20 +1128,20 @@ begin
       end if;
 
     when 'mark_paid' then
-      if o.payment_method <> 'gcash' or o.payment_status not in ('pending_verification', 'rejected')
+      if o.payment_method = 'cod' or o.payment_status not in ('pending_verification', 'rejected')
          or o.order_status <> 'processing' then
-        raise exception 'This order has no GCash payment waiting for verification.';
+        raise exception 'This order has no online payment waiting for verification.';
       end if;
       update public.orders
          set payment_status = 'paid', order_status = 'confirmed', payment_rejection_reason = null,
              cancel_requested = false
        where id = o.id;
       v_status := 'payment_confirmed';
-      v_note := coalesce(v_note, 'GCash payment verified.');
+      v_note := coalesce(v_note, public.payment_label(o.payment_method::text) || ' payment verified.');
 
     when 'reject_payment' then
-      if o.payment_method <> 'gcash' or o.payment_status <> 'pending_verification' or o.order_status <> 'processing' then
-        raise exception 'This order has no GCash payment waiting for verification.';
+      if o.payment_method = 'cod' or o.payment_status <> 'pending_verification' or o.order_status <> 'processing' then
+        raise exception 'This order has no online payment waiting for verification.';
       end if;
       if v_note is null then
         raise exception 'A reason is required to reject a payment.';
@@ -1248,20 +1291,20 @@ insert into public.hub_categories (id, name, slug, sort) values
 on conflict (id) do nothing;
 
 insert into public.stores (id, slug, name, tagline, hub_category_id, open_time, close_time, address, contact_note, cover_image_url, menu_image_url, is_accepting_orders, sort) values
-  ('825ac953-132e-5492-b28d-9c90bed43cf8', 'hazels-special-puto', 'Hazel''s Special Puto', 'Freshly Steamed & Delicious!', 'fb5b211c-c4e1-5839-b1e0-b68faac47bea', '07:00', '12:00', null, null, '/menus/hazels-special-puto.jpg', '/menus/hazels-special-puto.jpg', true, 1),
-  ('b9e4c752-717e-52a2-9c69-2c0a6c16ed36', 'aling-melys-carinderia', 'Aling Mely''s Carinderia', null, '506ed5af-9b3b-5c30-b057-8b241bcaebec', '09:00', '21:00', null, null, '/menus/aling-melys-carinderia.jpg', '/menus/aling-melys-carinderia.jpg', true, 2),
-  ('ea479bb9-bf61-5f08-9a97-d39c6883a525', 'okoy-ni-jay-r', 'Okoy ni Jay R!', 'Crispy on the outside, Loaded with Sarap inside! – Made with love para sa''yo!', 'dcbee9ff-c279-51b4-a25e-d4a9d966b4f1', '07:30', '20:00', null, 'For orders, message Jay R-D Original Okoy', '/menus/okoy-ni-jay-r.jpg', '/menus/okoy-ni-jay-r.jpg', true, 3),
-  ('e1b1ce8d-ae29-5daf-a4f5-e0898133cf55', 'aurings-special-pancit-malabon', 'Auring''s Special Pancit Malabon', null, '5766fd4d-eed3-5778-a5d9-bb78a2db89aa', '09:00', '17:00', null, null, '/menus/aurings-special-pancit-malabon.jpg', '/menus/aurings-special-pancit-malabon.jpg', true, 4),
-  ('a255909e-5058-5749-bf24-f4f2c8110ac1', 'normas-special-pancit-bilao', 'Norma''s Special Pancit Bilao', null, '5766fd4d-eed3-5778-a5d9-bb78a2db89aa', '09:00', '18:00', null, null, '/menus/normas-special-pancit-bilao.jpg', '/menus/normas-special-pancit-bilao.jpg', true, 5),
-  ('f84901f0-17f9-5697-ae5b-f64e7107f8f5', 'balsa-sa-niugan', 'Balsa sa Niugan', 'Floating Restaurant & Fishing Garden', '89ac3bc0-2fd2-5f7f-9b76-dd1a48f704e6', '10:00', '22:00', '#3 M. Aquino Street, Niugan, Malabon City', null, '/menus/balsa-sa-niugan.jpg', '/menus/balsa-sa-niugan.jpg', true, 6),
-  ('c9288804-cda0-5b4e-ae3b-387f5ed96172', 'original-benjie-puto-pao', 'Original Benjie Puto Pao', null, 'fb5b211c-c4e1-5839-b1e0-b68faac47bea', '08:00', '19:00', null, 'Prices are per piece', '/menus/original-benjie-puto-pao.jpg', '/menus/original-benjie-puto-pao.jpg', true, 7),
-  ('86d4db53-0799-50d5-bf64-c96a127e9eb1', 'raves-diner', 'Raves Diner', null, '95cfcde3-e9a6-5cc2-a0c5-2f2e6ca365ff', '11:00', '23:00', null, null, '/menus/raves-diner.jpg', '/menus/raves-diner.jpg', true, 8),
+  ('825ac953-132e-5492-b28d-9c90bed43cf8', 'hazels-special-puto', 'Hazel''s Special Puto', 'Freshly Steamed & Delicious!', 'fb5b211c-c4e1-5839-b1e0-b68faac47bea', '07:00', '12:00', null, null, '/menus/hazels-special-puto.jpg', '/menus/hazels-special-puto.jpg', true, 3),
+  ('b9e4c752-717e-52a2-9c69-2c0a6c16ed36', 'aling-melys-carinderia', 'Aling Mely''s Carinderia', null, '506ed5af-9b3b-5c30-b057-8b241bcaebec', '09:00', '21:00', null, null, '/menus/aling-melys-carinderia.jpg', '/menus/aling-melys-carinderia.jpg', true, 12),
+  ('ea479bb9-bf61-5f08-9a97-d39c6883a525', 'okoy-ni-jay-r', 'Okoy ni Jay R!', 'Crispy on the outside, Loaded with Sarap inside! Made with love para sa''yo!', 'dcbee9ff-c279-51b4-a25e-d4a9d966b4f1', '07:30', '20:00', null, 'For orders, message Jay R-D Original Okoy', '/menus/okoy-ni-jay-r.jpg', '/menus/okoy-ni-jay-r.jpg', true, 4),
+  ('e1b1ce8d-ae29-5daf-a4f5-e0898133cf55', 'aurings-special-pancit-malabon', 'Auring''s Special Pancit Malabon', null, '5766fd4d-eed3-5778-a5d9-bb78a2db89aa', '09:00', '17:00', null, null, '/menus/aurings-special-pancit-malabon.jpg', '/menus/aurings-special-pancit-malabon.jpg', true, 5),
+  ('a255909e-5058-5749-bf24-f4f2c8110ac1', 'normas-special-pancit-bilao', 'Norma''s Special Pancit Bilao', null, '5766fd4d-eed3-5778-a5d9-bb78a2db89aa', '09:00', '18:00', null, null, '/menus/normas-special-pancit-bilao.jpg', '/menus/normas-special-pancit-bilao.jpg', true, 6),
+  ('f84901f0-17f9-5697-ae5b-f64e7107f8f5', 'balsa-sa-niugan', 'Balsa sa Niugan', 'Floating Restaurant & Fishing Garden', '89ac3bc0-2fd2-5f7f-9b76-dd1a48f704e6', '10:00', '22:00', '#3 M. Aquino Street, Niugan, Malabon City', null, '/menus/balsa-sa-niugan.jpg', '/menus/balsa-sa-niugan.jpg', true, 7),
+  ('c9288804-cda0-5b4e-ae3b-387f5ed96172', 'original-benjie-puto-pao', 'Original Benjie Puto Pao', null, 'fb5b211c-c4e1-5839-b1e0-b68faac47bea', '08:00', '19:00', null, 'Prices are per piece', '/menus/original-benjie-puto-pao.jpg', '/menus/original-benjie-puto-pao.jpg', true, 8),
+  ('86d4db53-0799-50d5-bf64-c96a127e9eb1', 'raves-diner', 'Raves Diner', null, '95cfcde3-e9a6-5cc2-a0c5-2f2e6ca365ff', '11:00', '23:00', null, null, '/menus/raves-diner.jpg', '/menus/raves-diner.jpg', true, 13),
   ('76ba809c-e160-5a7a-9337-c6d8faaa65c4', 'mary-jay', 'Mary Jay', 'Since 1966', '89ac3bc0-2fd2-5f7f-9b76-dd1a48f704e6', '10:00', '22:00', null, null, '/menus/mary-jay.jpg', '/menus/mary-jay.jpg', true, 9),
   ('55c05919-6fd3-5662-9176-cc1dae43537b', 'rody-days', 'Rody Day''s', 'Good Food, Great Moments', '89ac3bc0-2fd2-5f7f-9b76-dd1a48f704e6', '10:00', '21:00', null, null, '/menus/rody-days.jpg', '/menus/rody-days.jpg', true, 10),
   ('9c32b2d9-bda5-5aed-9cdf-70ceb4ab566f', 'anny-dading-peachy-peachy', 'Anny ♥ Dading Peachy-Peachy', 'Pighta • Sarap • Pamilya', 'fb5b211c-c4e1-5839-b1e0-b68faac47bea', '06:00', '20:00', null, 'Pricelist effective April 2, 2026', '/menus/anny-dading-peachy-peachy.jpg', '/menus/anny-dading-peachy-peachy.jpg', true, 11),
-  ('5d4776d7-61d8-5535-974c-6bed41f7e005', 'judy-anns-crispy-pata', 'Judy Ann''s Crispy Pata', 'Good Food Brings People Together', '89ac3bc0-2fd2-5f7f-9b76-dd1a48f704e6', '10:00', '22:00', null, null, '/menus/judy-anns-crispy-pata.jpg', '/menus/judy-anns-crispy-pata.jpg', true, 12),
-  ('037d0dd2-97e4-5304-9b38-205890f3836f', 'sisig-ni-mutik', 'Sisig ni Mutik', 'Crispy • Saucy • Yummy', 'ad7877f7-2ab6-5c6f-a55d-06d24303a2e3', '10:00', '21:00', null, null, '/menus/sisig-ni-mutik.jpg', '/menus/sisig-ni-mutik.jpg', true, 13)
-on conflict (id) do nothing;
+  ('5d4776d7-61d8-5535-974c-6bed41f7e005', 'judy-anns-crispy-pata', 'Judy Ann''s Crispy Pata', 'Good Food Brings People Together', '89ac3bc0-2fd2-5f7f-9b76-dd1a48f704e6', '10:00', '22:00', null, null, '/menus/judy-anns-crispy-pata.jpg', '/menus/judy-anns-crispy-pata.jpg', true, 2),
+  ('037d0dd2-97e4-5304-9b38-205890f3836f', 'sisig-ni-mutik', 'Sisig ni Mutik', 'Crispy • Saucy • Yummy', 'ad7877f7-2ab6-5c6f-a55d-06d24303a2e3', '10:00', '21:00', null, null, '/menus/sisig-ni-mutik.jpg', '/menus/sisig-ni-mutik.jpg', true, 1)
+on conflict (id) do update set sort = excluded.sort, tagline = excluded.tagline;
 
 insert into public.menu_sections (id, store_id, name, note, sort) values
   ('d9dec416-5d93-541f-8d05-129b07a8e42d', '825ac953-132e-5492-b28d-9c90bed43cf8', 'Mix', null, 1),
@@ -1712,9 +1755,9 @@ insert into public.products (id, store_id, section_id, name, description, badge,
   ('75d7af40-0bc3-5497-9636-43300429c955', '5d4776d7-61d8-5535-974c-6bed41f7e005', '5648635e-8ad4-5bed-b1f9-08fd3e4dddbc', 'Breaded Fish Fillet (6pcs)', null, null, 8),
   ('4c94ca9b-b777-581e-b743-0fe6781e3e21', '5d4776d7-61d8-5535-974c-6bed41f7e005', '5648635e-8ad4-5bed-b1f9-08fd3e4dddbc', 'Sweet & Sour Fish Fillet', null, null, 9),
   ('af52ffd8-0f5f-5fe7-83e0-d92066939a00', '5d4776d7-61d8-5535-974c-6bed41f7e005', '5648635e-8ad4-5bed-b1f9-08fd3e4dddbc', 'Fish Fillet with Tofu & Tausi', null, 'best_seller', 10),
-  ('6716f0ec-9adc-5db3-9c09-5fb4870eace2', '5d4776d7-61d8-5535-974c-6bed41f7e005', '574ac9d3-6403-5fb2-b6d8-4be95aef196e', 'Judy Ann''s Kare-Kare – Goto', null, null, 1),
+  ('6716f0ec-9adc-5db3-9c09-5fb4870eace2', '5d4776d7-61d8-5535-974c-6bed41f7e005', '574ac9d3-6403-5fb2-b6d8-4be95aef196e', 'Judy Ann''s Kare-Kare (Goto)', null, null, 1),
   ('4709c507-1795-5ded-9574-0850954657c4', '5d4776d7-61d8-5535-974c-6bed41f7e005', '574ac9d3-6403-5fb2-b6d8-4be95aef196e', 'Lechon Kare-Kare', null, 'best_seller', 2),
-  ('3ed9ede7-53d5-55c4-bd0e-f55abdad8cde', '5d4776d7-61d8-5535-974c-6bed41f7e005', '574ac9d3-6403-5fb2-b6d8-4be95aef196e', 'Judy Ann''s Kare-Kare – Mix', null, null, 3),
+  ('3ed9ede7-53d5-55c4-bd0e-f55abdad8cde', '5d4776d7-61d8-5535-974c-6bed41f7e005', '574ac9d3-6403-5fb2-b6d8-4be95aef196e', 'Judy Ann''s Kare-Kare (Mix)', null, null, 3),
   ('07f0e56e-9014-552b-8ba4-605baa36c172', '5d4776d7-61d8-5535-974c-6bed41f7e005', '574ac9d3-6403-5fb2-b6d8-4be95aef196e', 'Sinigang na Baboy', null, null, 4),
   ('5290cee0-5849-5303-9995-a66286172958', '5d4776d7-61d8-5535-974c-6bed41f7e005', '574ac9d3-6403-5fb2-b6d8-4be95aef196e', 'Pork Sisig (6pcs)', null, null, 5),
   ('ee22a262-27b8-5888-ba62-84a9f9082c5b', '5d4776d7-61d8-5535-974c-6bed41f7e005', '574ac9d3-6403-5fb2-b6d8-4be95aef196e', 'Bistek Tagalog', null, null, 6),
@@ -1757,7 +1800,7 @@ insert into public.products (id, store_id, section_id, name, description, badge,
   ('023ee212-cbd1-507a-a0b9-76b886736d2f', '037d0dd2-97e4-5304-9b38-205890f3836f', '35e116b4-3215-5341-8baa-36c977599c96', 'Bagnet Bilao', null, null, 3),
   ('351ca4d2-19f6-52f6-82bc-3f60a66fb483', '037d0dd2-97e4-5304-9b38-205890f3836f', '35e116b4-3215-5341-8baa-36c977599c96', 'Bilao Shanghai', null, null, 4),
   ('5764d920-93cb-5641-9d04-3fc3839376a4', '037d0dd2-97e4-5304-9b38-205890f3836f', 'b966cf5d-e8f7-5bcb-980c-9a3e0cdbdf96', 'Crispy Pata', null, 'new', 1)
-on conflict (id) do nothing;
+on conflict (id) do update set name = excluded.name;
 
 insert into public.product_variants (id, product_id, label, price, addon_price, sort) values
   ('bed56a5d-f855-5d2a-a0cc-56185bcb2a3b', '9b061b07-40e4-56e1-a885-dc188bf5d22a', '10pcs', 348.00, null, 1),

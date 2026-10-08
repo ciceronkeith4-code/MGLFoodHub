@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, Download, FilterX, Phone, Search } from 'luc
 import { supabase, errorMessage } from '@/lib/supabase'
 import { useCatalog } from '@/hooks/useCatalog'
 import { downloadCsv } from '@/lib/csv'
-import { ORDER_STATUS_LABEL, PAYMENT_STATUS_LABEL } from '@/lib/orderStatus'
+import { ONLINE_METHODS, ORDER_STATUS_LABEL, PAYMENT_METHOD_LABEL, PAYMENT_STATUS_LABEL } from '@/lib/orderStatus'
 import type { OrderRow } from '@/lib/types'
 import { formatDate, formatDateTime, formatPhone, peso, slotLabel } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -28,7 +28,8 @@ function useOrderQuery(params: URLSearchParams) {
       if (f.status === 'cancel_requested') q = q.eq('cancel_requested', true)
       else if (f.status === 'active') q = q.not('order_status', 'in', '(delivered,cancelled)')
       else if (f.status) q = q.eq('order_status', f.status)
-      if (f.method) q = q.eq('payment_method', f.method)
+      if (f.method === 'online') q = q.neq('payment_method', 'cod')
+      else if (f.method) q = q.eq('payment_method', f.method)
       if (f.pstatus) q = q.eq('payment_status', f.pstatus)
       if (f.store) q = q.eq('order_items.store_id', f.store)
       const s = (f.q ?? '').replace(/[,()%*\\]/g, ' ').trim()
@@ -103,12 +104,12 @@ export default function Orders() {
     const list = (data ?? []) as unknown as Full[]
     downloadCsv(
       `mgl-orders-${new Date().toISOString().slice(0, 10)}.csv`,
-      ['Order #', 'Placed', 'Delivery date', 'Slot', 'Customer', 'Phone', 'Email', 'Social', 'Address', 'Barangay', 'City', 'Landmark', 'Payment', 'Payment status', 'Order status', 'GCash ref', 'Items', 'Food subtotal', 'Delivery fee', 'Total', 'Customer notes', 'Admin notes', 'Cancel reason'],
+      ['Order #', 'Placed', 'Delivery date', 'Slot', 'Customer', 'Phone', 'Email', 'Social', 'Address', 'Barangay', 'City', 'Landmark', 'Payment', 'Payment status', 'Order status', 'Payment ref', 'Items', 'Food subtotal', 'Delivery fee', 'Total', 'Customer notes', 'Admin notes', 'Cancel reason'],
       list.map((o) => [
         o.order_number, formatDateTime(o.created_at), o.delivery_date, slotLabel(o.delivery_slot), o.customer_name, o.phone, o.email, o.social_media,
-        o.address, o.barangay, o.city, o.landmark, o.payment_method.toUpperCase(), PAYMENT_STATUS_LABEL[o.payment_status], ORDER_STATUS_LABEL[o.order_status],
+        o.address, o.barangay, o.city, o.landmark, PAYMENT_METHOD_LABEL[o.payment_method], PAYMENT_STATUS_LABEL[o.payment_status], ORDER_STATUS_LABEL[o.order_status],
         o.gcash_reference,
-        o.order_items.map((i) => `${i.quantity}x ${i.store_name_snapshot} – ${i.product_name_snapshot}${i.variant_label_snapshot !== 'Regular' ? ` (${i.variant_label_snapshot})` : ''}${i.options_snapshot.length ? ` [${i.options_snapshot.map((x) => x.choice === 'Yes' ? x.group : x.choice).join(', ')}]` : ''}`).join('; '),
+        o.order_items.map((i) => `${i.quantity}x ${i.store_name_snapshot}: ${i.product_name_snapshot}${i.variant_label_snapshot !== 'Regular' ? ` (${i.variant_label_snapshot})` : ''}${i.options_snapshot.length ? ` [${i.options_snapshot.map((x) => x.choice === 'Yes' ? x.group : x.choice).join(', ')}]` : ''}`).join('; '),
         Number(o.subtotal).toFixed(2), Number(o.delivery_fee).toFixed(2), Number(o.total).toFixed(2), o.customer_notes, o.admin_notes, o.cancel_reason,
       ]),
     )
@@ -144,9 +145,12 @@ export default function Orders() {
           <option value="cancel_requested">Cancel requested</option>
         </NativeSelect>
         <NativeSelect value={params.get('method') ?? ''} onChange={(e) => update({ method: e.target.value })} aria-label="Payment method">
-          <option value="">COD + GCash</option>
+          <option value="">All payment methods</option>
           <option value="cod">COD</option>
-          <option value="gcash">GCash</option>
+          <option value="online">Online (all)</option>
+          {ONLINE_METHODS.map((m) => (
+            <option key={m} value={m}>{PAYMENT_METHOD_LABEL[m]}</option>
+          ))}
         </NativeSelect>
         <NativeSelect value={params.get('pstatus') ?? ''} onChange={(e) => update({ pstatus: e.target.value })} aria-label="Payment status">
           <option value="">Any payment status</option>

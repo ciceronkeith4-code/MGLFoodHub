@@ -7,7 +7,8 @@ import { useCart } from '@/store/cart'
 import { supabase, errorMessage } from '@/lib/supabase'
 import { saveMyOrder } from '@/lib/myOrders'
 import { extOf, prepareImage } from '@/lib/image'
-import { customerStatus, historyLabel, PAYMENT_METHOD_LABEL, progressSteps, type Tone } from '@/lib/orderStatus'
+import { customerStatus, historyLabel, isOnline, PAYMENT_METHOD_LABEL, progressSteps, type Tone } from '@/lib/orderStatus'
+import { PaymentLogo } from '@/components/PaymentLogo'
 import type { PublicOrder } from '@/lib/types'
 import { cn, formatDate, formatDateTime, peso, randomId, slotLabel, trackingUrl } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -87,7 +88,7 @@ export default function Track() {
   const status = customerStatus(order)
   const steps = progressSteps(order)
   const canRequestCancel = order.order_status === 'processing' && !order.cancel_requested
-  const needsProof = order.payment_method === 'gcash' && order.payment_status === 'rejected' && order.order_status === 'processing'
+  const needsProof = isOnline(order.payment_method) && order.payment_status === 'rejected' && order.order_status === 'processing'
 
   return (
     <div className="mx-auto max-w-2xl space-y-5 px-4 py-8 sm:py-12">
@@ -135,7 +136,7 @@ export default function Track() {
         </div>
       </div>
 
-      {needsProof && <ResubmitProof token={token} onDone={reload} />}
+      {needsProof && <ResubmitProof token={token} label={PAYMENT_METHOD_LABEL[order.payment_method]} onDone={reload} />}
 
       {/* Progress */}
       {order.order_status !== 'cancelled' && (
@@ -173,8 +174,11 @@ export default function Track() {
           </div>
           <div>
             <p className="text-xs text-navy/55">Payment method</p>
-            <p className="font-semibold">{PAYMENT_METHOD_LABEL[order.payment_method]}</p>
-            {order.gcash_reference && <p className="text-navy/70">Ref: {order.gcash_reference}</p>}
+            <div className="mt-1 flex items-center gap-2">
+              <PaymentLogo method={order.payment_method} className="h-8 w-12 rounded-lg" />
+              <p className="min-w-0 font-semibold">{PAYMENT_METHOD_LABEL[order.payment_method]}</p>
+            </div>
+            {order.gcash_reference && <p className="mt-1 break-all text-navy/70">Ref: {order.gcash_reference}</p>}
           </div>
           <div className="col-span-2">
             <p className="text-xs text-navy/55">Deliver to</p>
@@ -244,8 +248,8 @@ function Totals({ order }: { order: PublicOrder }) {
         <span>Total</span>
         <span className="tabular-nums">{peso(order.total)}</span>
       </div>
-      {order.payment_method === 'gcash' && order.payment_status === 'paid' && (
-        <p className="text-xs text-emerald-700">✓ Food subtotal paid via GCash{fee > 0 ? '. Please pay the delivery fee to the rider.' : '.'}</p>
+      {isOnline(order.payment_method) && order.payment_status === 'paid' && (
+        <p className="text-xs text-emerald-700">✓ Food subtotal paid via {PAYMENT_METHOD_LABEL[order.payment_method]}{fee > 0 ? '. Please pay the delivery fee to the rider.' : '.'}</p>
       )}
     </div>
   )
@@ -299,14 +303,14 @@ function CancelRequest({ token, onDone }: { token: string; onDone: () => Promise
   )
 }
 
-function ResubmitProof({ token, onDone }: { token: string; onDone: () => Promise<void> }) {
+function ResubmitProof({ token, label, onDone }: { token: string; label: string; onDone: () => Promise<void> }) {
   const deviceId = useCart((s) => s.deviceId)
   const [ref, setRef] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
   const submit = async () => {
-    if (!/^[A-Za-z0-9 -]{4,40}$/.test(ref.trim())) return toast.error('Please enter the GCash reference number.')
-    if (!file) return toast.error('Please upload a screenshot of your GCash payment.')
+    if (!/^[A-Za-z0-9 -]{4,40}$/.test(ref.trim())) return toast.error(`Please enter the ${label} reference number.`)
+    if (!file) return toast.error(`Please upload a screenshot of your ${label} payment.`)
     setBusy(true)
     try {
       const img = await prepareImage(file)
@@ -325,8 +329,8 @@ function ResubmitProof({ token, onDone }: { token: string; onDone: () => Promise
   }
   return (
     <div className="space-y-3 rounded-2xl bg-white ring-1 ring-sand-200/70 p-4 sm:p-5">
-      <h2 className="font-heading font-bold">Re-upload GCash payment proof</h2>
-      <Field label="GCash Reference No." required>
+      <h2 className="font-heading font-bold">Upload a new {label} payment proof</h2>
+      <Field label={`${label} Reference No.`} required>
         <Input value={ref} onChange={(e) => setRef(e.target.value)} inputMode="numeric" placeholder="e.g. 1234 567 890123" />
       </Field>
       <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed border-navy/15 p-3 hover:border-brand">

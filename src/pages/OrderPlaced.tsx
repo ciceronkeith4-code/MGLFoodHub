@@ -4,6 +4,7 @@ import { ArrowRight, CheckCircle2, PackageSearch } from 'lucide-react'
 import { useTrackedOrder } from '@/hooks/useTrackedOrder'
 import { saveMyOrder } from '@/lib/myOrders'
 import { PAYMENT_METHOD_LABEL } from '@/lib/orderStatus'
+import { PaymentLogo } from '@/components/PaymentLogo'
 import { formatDate, peso, slotLabel, trackingUrl } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/controls'
@@ -90,7 +91,10 @@ export default function OrderPlaced() {
             </div>
             <div>
               <p className="text-xs text-navy/55">Payment</p>
-              <p className="font-semibold">{PAYMENT_METHOD_LABEL[order.payment_method]}</p>
+              <p className="my-1.5 flex items-center gap-2 font-semibold">
+                <PaymentLogo method={order.payment_method} className="h-8 w-12 rounded-lg" />
+                {PAYMENT_METHOD_LABEL[order.payment_method]}
+              </p>
               <p className="text-navy/70">
                 {order.payment_method === 'cod' ? "We'll call you to confirm" : 'Verifying your payment'}
               </p>

@@ -147,6 +147,13 @@ await expectError(pg, 'select * from settings', [], 'permission denied', 'anon c
 await expectError(pg, 'update products set is_sold_out = true', [], 'permission denied', 'anon cannot update products')
 await expectError(pg, `select admin_order_action(gen_random_uuid(), 'confirm')`, [], 'permission denied', 'anon cannot call admin_order_action')
 const info = (await pg.query('select get_checkout_info() as i')).rows[0].i
+ok(['gcash', 'maribank', 'gotyme'].every((m) => info.payment_accounts?.[m] && 'number' in info.payment_accounts[m]), 'checkout info lists GCash, MariBank and GoTyme accounts')
+ok(info.ordering_guidelines.some((g) => g.includes('MariBank') && g.includes('GoTyme')), 'guidelines mention MariBank and GoTyme')
+const storeOrder = (await pg.query('select slug from stores order by sort')).rows.map((r) => r.slug)
+ok(storeOrder[0] === 'sisig-ni-mutik' && storeOrder[1] === 'judy-anns-crispy-pata', 'Sisig ni Mutik first, Judy Ann\'s Crispy Pata second')
+ok(storeOrder.at(-2) === 'aling-melys-carinderia' && storeOrder.at(-1) === 'raves-diner', 'Aling Mely\'s and Raves Diner last')
+const dashText = (await pg.query(`select count(*)::int n from (select tagline t from stores union all select name from products) x where t ~ '[–—]'`)).rows[0].n
+ok(dashText === 0, 'no dashes in store taglines or product names')
 ok(Array.isArray(info.ordering_guidelines) && info.ordering_guidelines.length === 6, 'checkout info includes the 6 ordering guidelines')
 ok(info.min_date > info.today, `checkout min date (${info.min_date}) is after today (${info.today})`)
 
@@ -190,7 +197,7 @@ ok((await pg.query('select get_order_by_token($1) as o', ['x'.repeat(32)])).rows
 const r2 = (await place({ ...base, device_id: 'device-b', customer_name: 'Maria', phone: '+639181112222', items: [{ variant_id: okoy, quantity: 1 }] })).rows[0].r
 ok(r2.tracking_token !== r1.tracking_token && r2.order_number !== r1.order_number, 'two simultaneous customers get separate orders')
 
-await expectError(pg, 'select place_order($1::jsonb)', [JSON.stringify({ ...base, delivery_date: info.today, items: [{ variant_id: okoy, quantity: 1 }] })], 'Same-day', 'today is rejected')
+await expectError(pg, 'select place_order($1::jsonb)', [JSON.stringify({ ...base, delivery_date: info.today, items: [{ variant_id: okoy, quantity: 1 }] })], 'Same day', 'today is rejected')
 await expectError(pg, 'select place_order($1::jsonb)', [JSON.stringify({ ...base, delivery_date: '2099-01-01', items: [{ variant_id: okoy, quantity: 1 }] })], 'up to', 'date beyond max days is rejected')
 await expectError(pg, 'select place_order($1::jsonb)', [JSON.stringify({ ...base, delivery_slot: '06:00-07:00', items: [{ variant_id: okoy, quantity: 1 }] })], 'outside the store hours', 'slot before store opens is rejected')
 await expectError(pg, 'select place_order($1::jsonb)', [JSON.stringify({ ...base, phone: '12345', items: [{ variant_id: okoy, quantity: 1 }] })], 'valid PH mobile', 'bad phone rejected')
@@ -320,6 +327,42 @@ await asRole('authenticated', adminId, 'admin@mgl.ph')
 await asSuper()
 await pg.query(`update product_variants set is_sold_out = true where id = $1`, [okoy])
 await asRole('authenticated', adminId, 'admin@mgl.ph')
+
+// MariBank and GoTyme work like GCash: reference + screenshot, admin verifies
+console.log('\nMariBank + GoTyme')
+await asSuper()
+await pg.query(`update product_variants set is_sold_out = false where id = $1`, [okoy])
+await asRole('anon')
+await pg.query(`insert into storage.objects (bucket_id, name) values ('payment-proofs', 'proofs/device-d/mari.png'), ('payment-proofs', 'proofs/device-d/goty.png'), ('payment-proofs', 'proofs/device-d/goty2.png')`)
+await expectError(pg, 'select place_order($1::jsonb)', [JSON.stringify({ ...base, phone: '09170000007', payment_method: 'maribank', gcash_reference: '', gcash_proof_path: 'proofs/device-d/mari.png', items: [{ variant_id: okoy, quantity: 1 }] })], 'MariBank reference', 'MariBank requires a reference number')
+await expectError(pg, 'select place_order($1::jsonb)', [JSON.stringify({ ...base, phone: '09170000007', payment_method: 'gotyme', gcash_reference: '55556666', gcash_proof_path: 'proofs/device-d/nope.png', items: [{ variant_id: okoy, quantity: 1 }] })], 'GoTyme payment', 'GoTyme requires an uploaded screenshot')
+await expectError(pg, 'select place_order($1::jsonb)', [JSON.stringify({ ...base, phone: '09170000007', payment_method: 'paypal', items: [{ variant_id: okoy, quantity: 1 }] })], 'choose a payment method', 'unknown payment method rejected')
+const r7 = (await place({ ...base, phone: '09170000007', payment_method: 'maribank', gcash_reference: 'MB 123 456', gcash_proof_path: 'proofs/device-d/mari.png', items: [{ variant_id: okoy, quantity: 1 }] })).rows[0].r
+const r8 = (await place({ ...base, phone: '09170000008', payment_method: 'gotyme', gcash_reference: 'GT998877', gcash_proof_path: 'proofs/device-d/goty.png', items: [{ variant_id: okoy, quantity: 1 }] })).rows[0].r
+const o7 = (await pg.query('select get_order_by_token($1) as o', [r7.tracking_token])).rows[0].o
+const o8 = (await pg.query('select get_order_by_token($1) as o', [r8.tracking_token])).rows[0].o
+ok(o7.payment_method === 'maribank' && o7.payment_status === 'pending_verification' && o7.gcash_reference === 'MB123456', 'MariBank order placed, waiting for verification')
+ok(o8.payment_method === 'gotyme' && o8.payment_status === 'pending_verification', 'GoTyme order placed, waiting for verification')
+ok(o7.history[0].note.startsWith('MariBank payment submitted') && o8.history[0].note.startsWith('GoTyme payment submitted'), 'history notes name the right bank')
+await asSuper()
+const id7 = await orderId(r7.tracking_token)
+const id8 = await orderId(r8.tracking_token)
+await asRole('authenticated', adminId, 'admin@mgl.ph')
+await pg.query(`select admin_order_action($1, 'confirm')`, [id7])
+const p7 = (await pg.query('select payment_status, order_status from orders where id = $1', [id7])).rows[0]
+ok(p7.payment_status === 'paid' && p7.order_status === 'confirmed', 'Confirm Order on MariBank → paid + confirmed')
+await pg.query(`select admin_order_action($1, 'reject_payment', 'Wrong amount')`, [id8])
+await asRole('anon')
+await pg.query('select resubmit_gcash_proof($1, $2, $3)', [r8.tracking_token, 'GT111222', 'proofs/device-d/goty2.png'])
+const t8 = (await pg.query('select get_order_by_token($1) as o', [r8.tracking_token])).rows[0].o
+ok(t8.payment_status === 'pending_verification' && t8.history.at(-1).note.startsWith('New GoTyme payment proof'), 'GoTyme: rejected → customer sends a new proof')
+await asRole('authenticated', adminId, 'admin@mgl.ph')
+await pg.query(`select admin_order_action($1, 'mark_paid')`, [id8])
+const t8b = (await pg.query('select payment_status, order_status from orders where id = $1', [id8])).rows[0]
+ok(t8b.payment_status === 'paid' && t8b.order_status === 'confirmed', 'GoTyme: Mark as Paid → paid + confirmed')
+await expectError(pg, `select admin_order_action($1, 'reject_payment', 'x')`, [id1], 'no online payment', 'cannot reject payment on a COD order')
+await asSuper()
+await pg.query(`update product_variants set is_sold_out = true where id = $1`, [okoy])
 
 // Sold-out variant is rejected at checkout
 await asRole('anon')

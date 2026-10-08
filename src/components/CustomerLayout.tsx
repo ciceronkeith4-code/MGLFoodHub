@@ -1,8 +1,9 @@
 import { Suspense, useEffect, type ReactNode } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
-import { ArrowRight, Banknote, ClipboardList, Home, Info, Leaf, Search, ShoppingBag, Smartphone, Store as StoreIcon, type LucideIcon } from 'lucide-react'
+import { ArrowRight, Banknote, ClipboardList, Home, Info, Leaf, Search, ShoppingBag, Store as StoreIcon, type LucideIcon } from 'lucide-react'
 import { useCartView, useCatalog } from '@/hooks/useCatalog'
 import { cn, peso } from '@/lib/utils'
+import { ONLINE_METHODS, PAYMENT_LOGO, PAYMENT_METHOD_LABEL } from '@/lib/orderStatus'
 import { Logo } from './Logo'
 import { CartSheet, useCartUI } from './Cart'
 import { OrderingGuidelines, useGuidelines } from './OrderingGuidelines'
@@ -161,14 +162,16 @@ function Footer() {
           <div className="col-span-2 space-y-4 lg:col-span-1">
             <Logo light className="h-16 rounded-xl p-1.5" />
             <p className="font-script text-2xl text-brand">Good food, on schedule.</p>
-            <p className="max-w-xs text-sm text-white/65">13 Malabon favorites in one cart — scheduled delivery straight to your door.</p>
+            <p className="max-w-xs text-sm text-white/65">13 Malabon favorites in one cart, with scheduled delivery straight to your door.</p>
             <div className="flex flex-wrap gap-2 text-xs">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5">
                 <Banknote className="size-3.5" /> Cash on Delivery
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5">
-                <Smartphone className="size-3.5" /> GCash
-              </span>
+              {ONLINE_METHODS.map((m) => (
+                <span key={m} className="inline-flex h-[30px] items-center rounded-full bg-white px-3" title={PAYMENT_METHOD_LABEL[m]}>
+                  <img src={PAYMENT_LOGO[m]} alt={PAYMENT_METHOD_LABEL[m]} className="h-4 w-auto max-w-16 object-contain" />
+                </span>
+              ))}
             </div>
           </div>
           <div>

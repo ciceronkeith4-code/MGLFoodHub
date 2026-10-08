@@ -8,8 +8,8 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dial
 /** Shown until the admin's version loads (and if it can't load). Admins edit these in Settings. */
 export const DEFAULT_GUIDELINES = [
   'We deliver via Grab within Metro Manila from 12:00 PM to 6:00 PM.',
-  'Pay by Cash on Delivery (COD) or online (GCash).',
-  'Orders are for booking (scheduled delivery) only. Same-day delivery is not available.',
+  'Pay by Cash on Delivery (COD) or online via GCash, MariBank or GoTyme.',
+  'Orders are for booking (scheduled delivery) only. Same day delivery is not available.',
   'We will confirm your order by text or call.',
   'Menu prices are VAT inclusive and may vary or be subject to change by the merchant. Higher delivery fees may also apply for long distance deliveries.',
   'You can order from all merchants in the app and pay only one delivery fee.',
@@ -54,7 +54,7 @@ export function OrderingGuidelines() {
           <DialogTitle className="relative pr-0 font-display text-2xl font-bold sm:text-[1.7rem]">Ordering Guidelines</DialogTitle>
           <DialogDescription className="relative text-navy/60">Please read before placing your order. Salamat po!</DialogDescription>
         </div>
-        <ol className="min-h-0 flex-1 space-y-3.5 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6">
+        <ol className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-5 pb-7 pt-4 [mask-image:linear-gradient(to_bottom,black_calc(100%-1.75rem),transparent)] sm:px-6">
           {items.map((text, i) => {
             const Icon = ICONS[i] ?? BadgeCheck
             return (

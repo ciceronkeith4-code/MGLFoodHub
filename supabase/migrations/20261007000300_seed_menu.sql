@@ -14,20 +14,20 @@ insert into public.hub_categories (id, name, slug, sort) values
 on conflict (id) do nothing;
 
 insert into public.stores (id, slug, name, tagline, hub_category_id, open_time, close_time, address, contact_note, cover_image_url, menu_image_url, is_accepting_orders, sort) values
-  ('825ac953-132e-5492-b28d-9c90bed43cf8', 'hazels-special-puto', 'Hazel''s Special Puto', 'Freshly Steamed & Delicious!', 'fb5b211c-c4e1-5839-b1e0-b68faac47bea', '07:00', '12:00', null, null, '/menus/hazels-special-puto.jpg', '/menus/hazels-special-puto.jpg', true, 1),
-  ('b9e4c752-717e-52a2-9c69-2c0a6c16ed36', 'aling-melys-carinderia', 'Aling Mely''s Carinderia', null, '506ed5af-9b3b-5c30-b057-8b241bcaebec', '09:00', '21:00', null, null, '/menus/aling-melys-carinderia.jpg', '/menus/aling-melys-carinderia.jpg', true, 2),
-  ('ea479bb9-bf61-5f08-9a97-d39c6883a525', 'okoy-ni-jay-r', 'Okoy ni Jay R!', 'Crispy on the outside, Loaded with Sarap inside! – Made with love para sa''yo!', 'dcbee9ff-c279-51b4-a25e-d4a9d966b4f1', '07:30', '20:00', null, 'For orders, message Jay R-D Original Okoy', '/menus/okoy-ni-jay-r.jpg', '/menus/okoy-ni-jay-r.jpg', true, 3),
-  ('e1b1ce8d-ae29-5daf-a4f5-e0898133cf55', 'aurings-special-pancit-malabon', 'Auring''s Special Pancit Malabon', null, '5766fd4d-eed3-5778-a5d9-bb78a2db89aa', '09:00', '17:00', null, null, '/menus/aurings-special-pancit-malabon.jpg', '/menus/aurings-special-pancit-malabon.jpg', true, 4),
-  ('a255909e-5058-5749-bf24-f4f2c8110ac1', 'normas-special-pancit-bilao', 'Norma''s Special Pancit Bilao', null, '5766fd4d-eed3-5778-a5d9-bb78a2db89aa', '09:00', '18:00', null, null, '/menus/normas-special-pancit-bilao.jpg', '/menus/normas-special-pancit-bilao.jpg', true, 5),
-  ('f84901f0-17f9-5697-ae5b-f64e7107f8f5', 'balsa-sa-niugan', 'Balsa sa Niugan', 'Floating Restaurant & Fishing Garden', '89ac3bc0-2fd2-5f7f-9b76-dd1a48f704e6', '10:00', '22:00', '#3 M. Aquino Street, Niugan, Malabon City', null, '/menus/balsa-sa-niugan.jpg', '/menus/balsa-sa-niugan.jpg', true, 6),
-  ('c9288804-cda0-5b4e-ae3b-387f5ed96172', 'original-benjie-puto-pao', 'Original Benjie Puto Pao', null, 'fb5b211c-c4e1-5839-b1e0-b68faac47bea', '08:00', '19:00', null, 'Prices are per piece', '/menus/original-benjie-puto-pao.jpg', '/menus/original-benjie-puto-pao.jpg', true, 7),
-  ('86d4db53-0799-50d5-bf64-c96a127e9eb1', 'raves-diner', 'Raves Diner', null, '95cfcde3-e9a6-5cc2-a0c5-2f2e6ca365ff', '11:00', '23:00', null, null, '/menus/raves-diner.jpg', '/menus/raves-diner.jpg', true, 8),
+  ('825ac953-132e-5492-b28d-9c90bed43cf8', 'hazels-special-puto', 'Hazel''s Special Puto', 'Freshly Steamed & Delicious!', 'fb5b211c-c4e1-5839-b1e0-b68faac47bea', '07:00', '12:00', null, null, '/menus/hazels-special-puto.jpg', '/menus/hazels-special-puto.jpg', true, 3),
+  ('b9e4c752-717e-52a2-9c69-2c0a6c16ed36', 'aling-melys-carinderia', 'Aling Mely''s Carinderia', null, '506ed5af-9b3b-5c30-b057-8b241bcaebec', '09:00', '21:00', null, null, '/menus/aling-melys-carinderia.jpg', '/menus/aling-melys-carinderia.jpg', true, 12),
+  ('ea479bb9-bf61-5f08-9a97-d39c6883a525', 'okoy-ni-jay-r', 'Okoy ni Jay R!', 'Crispy on the outside, Loaded with Sarap inside! Made with love para sa''yo!', 'dcbee9ff-c279-51b4-a25e-d4a9d966b4f1', '07:30', '20:00', null, 'For orders, message Jay R-D Original Okoy', '/menus/okoy-ni-jay-r.jpg', '/menus/okoy-ni-jay-r.jpg', true, 4),
+  ('e1b1ce8d-ae29-5daf-a4f5-e0898133cf55', 'aurings-special-pancit-malabon', 'Auring''s Special Pancit Malabon', null, '5766fd4d-eed3-5778-a5d9-bb78a2db89aa', '09:00', '17:00', null, null, '/menus/aurings-special-pancit-malabon.jpg', '/menus/aurings-special-pancit-malabon.jpg', true, 5),
+  ('a255909e-5058-5749-bf24-f4f2c8110ac1', 'normas-special-pancit-bilao', 'Norma''s Special Pancit Bilao', null, '5766fd4d-eed3-5778-a5d9-bb78a2db89aa', '09:00', '18:00', null, null, '/menus/normas-special-pancit-bilao.jpg', '/menus/normas-special-pancit-bilao.jpg', true, 6),
+  ('f84901f0-17f9-5697-ae5b-f64e7107f8f5', 'balsa-sa-niugan', 'Balsa sa Niugan', 'Floating Restaurant & Fishing Garden', '89ac3bc0-2fd2-5f7f-9b76-dd1a48f704e6', '10:00', '22:00', '#3 M. Aquino Street, Niugan, Malabon City', null, '/menus/balsa-sa-niugan.jpg', '/menus/balsa-sa-niugan.jpg', true, 7),
+  ('c9288804-cda0-5b4e-ae3b-387f5ed96172', 'original-benjie-puto-pao', 'Original Benjie Puto Pao', null, 'fb5b211c-c4e1-5839-b1e0-b68faac47bea', '08:00', '19:00', null, 'Prices are per piece', '/menus/original-benjie-puto-pao.jpg', '/menus/original-benjie-puto-pao.jpg', true, 8),
+  ('86d4db53-0799-50d5-bf64-c96a127e9eb1', 'raves-diner', 'Raves Diner', null, '95cfcde3-e9a6-5cc2-a0c5-2f2e6ca365ff', '11:00', '23:00', null, null, '/menus/raves-diner.jpg', '/menus/raves-diner.jpg', true, 13),
   ('76ba809c-e160-5a7a-9337-c6d8faaa65c4', 'mary-jay', 'Mary Jay', 'Since 1966', '89ac3bc0-2fd2-5f7f-9b76-dd1a48f704e6', '10:00', '22:00', null, null, '/menus/mary-jay.jpg', '/menus/mary-jay.jpg', true, 9),
   ('55c05919-6fd3-5662-9176-cc1dae43537b', 'rody-days', 'Rody Day''s', 'Good Food, Great Moments', '89ac3bc0-2fd2-5f7f-9b76-dd1a48f704e6', '10:00', '21:00', null, null, '/menus/rody-days.jpg', '/menus/rody-days.jpg', true, 10),
   ('9c32b2d9-bda5-5aed-9cdf-70ceb4ab566f', 'anny-dading-peachy-peachy', 'Anny ♥ Dading Peachy-Peachy', 'Pighta • Sarap • Pamilya', 'fb5b211c-c4e1-5839-b1e0-b68faac47bea', '06:00', '20:00', null, 'Pricelist effective April 2, 2026', '/menus/anny-dading-peachy-peachy.jpg', '/menus/anny-dading-peachy-peachy.jpg', true, 11),
-  ('5d4776d7-61d8-5535-974c-6bed41f7e005', 'judy-anns-crispy-pata', 'Judy Ann''s Crispy Pata', 'Good Food Brings People Together', '89ac3bc0-2fd2-5f7f-9b76-dd1a48f704e6', '10:00', '22:00', null, null, '/menus/judy-anns-crispy-pata.jpg', '/menus/judy-anns-crispy-pata.jpg', true, 12),
-  ('037d0dd2-97e4-5304-9b38-205890f3836f', 'sisig-ni-mutik', 'Sisig ni Mutik', 'Crispy • Saucy • Yummy', 'ad7877f7-2ab6-5c6f-a55d-06d24303a2e3', '10:00', '21:00', null, null, '/menus/sisig-ni-mutik.jpg', '/menus/sisig-ni-mutik.jpg', true, 13)
-on conflict (id) do nothing;
+  ('5d4776d7-61d8-5535-974c-6bed41f7e005', 'judy-anns-crispy-pata', 'Judy Ann''s Crispy Pata', 'Good Food Brings People Together', '89ac3bc0-2fd2-5f7f-9b76-dd1a48f704e6', '10:00', '22:00', null, null, '/menus/judy-anns-crispy-pata.jpg', '/menus/judy-anns-crispy-pata.jpg', true, 2),
+  ('037d0dd2-97e4-5304-9b38-205890f3836f', 'sisig-ni-mutik', 'Sisig ni Mutik', 'Crispy • Saucy • Yummy', 'ad7877f7-2ab6-5c6f-a55d-06d24303a2e3', '10:00', '21:00', null, null, '/menus/sisig-ni-mutik.jpg', '/menus/sisig-ni-mutik.jpg', true, 1)
+on conflict (id) do update set sort = excluded.sort, tagline = excluded.tagline;
 
 insert into public.menu_sections (id, store_id, name, note, sort) values
   ('d9dec416-5d93-541f-8d05-129b07a8e42d', '825ac953-132e-5492-b28d-9c90bed43cf8', 'Mix', null, 1),
@@ -478,9 +478,9 @@ insert into public.products (id, store_id, section_id, name, description, badge,
   ('75d7af40-0bc3-5497-9636-43300429c955', '5d4776d7-61d8-5535-974c-6bed41f7e005', '5648635e-8ad4-5bed-b1f9-08fd3e4dddbc', 'Breaded Fish Fillet (6pcs)', null, null, 8),
   ('4c94ca9b-b777-581e-b743-0fe6781e3e21', '5d4776d7-61d8-5535-974c-6bed41f7e005', '5648635e-8ad4-5bed-b1f9-08fd3e4dddbc', 'Sweet & Sour Fish Fillet', null, null, 9),
   ('af52ffd8-0f5f-5fe7-83e0-d92066939a00', '5d4776d7-61d8-5535-974c-6bed41f7e005', '5648635e-8ad4-5bed-b1f9-08fd3e4dddbc', 'Fish Fillet with Tofu & Tausi', null, 'best_seller', 10),
-  ('6716f0ec-9adc-5db3-9c09-5fb4870eace2', '5d4776d7-61d8-5535-974c-6bed41f7e005', '574ac9d3-6403-5fb2-b6d8-4be95aef196e', 'Judy Ann''s Kare-Kare – Goto', null, null, 1),
+  ('6716f0ec-9adc-5db3-9c09-5fb4870eace2', '5d4776d7-61d8-5535-974c-6bed41f7e005', '574ac9d3-6403-5fb2-b6d8-4be95aef196e', 'Judy Ann''s Kare-Kare (Goto)', null, null, 1),
   ('4709c507-1795-5ded-9574-0850954657c4', '5d4776d7-61d8-5535-974c-6bed41f7e005', '574ac9d3-6403-5fb2-b6d8-4be95aef196e', 'Lechon Kare-Kare', null, 'best_seller', 2),
-  ('3ed9ede7-53d5-55c4-bd0e-f55abdad8cde', '5d4776d7-61d8-5535-974c-6bed41f7e005', '574ac9d3-6403-5fb2-b6d8-4be95aef196e', 'Judy Ann''s Kare-Kare – Mix', null, null, 3),
+  ('3ed9ede7-53d5-55c4-bd0e-f55abdad8cde', '5d4776d7-61d8-5535-974c-6bed41f7e005', '574ac9d3-6403-5fb2-b6d8-4be95aef196e', 'Judy Ann''s Kare-Kare (Mix)', null, null, 3),
   ('07f0e56e-9014-552b-8ba4-605baa36c172', '5d4776d7-61d8-5535-974c-6bed41f7e005', '574ac9d3-6403-5fb2-b6d8-4be95aef196e', 'Sinigang na Baboy', null, null, 4),
   ('5290cee0-5849-5303-9995-a66286172958', '5d4776d7-61d8-5535-974c-6bed41f7e005', '574ac9d3-6403-5fb2-b6d8-4be95aef196e', 'Pork Sisig (6pcs)', null, null, 5),
   ('ee22a262-27b8-5888-ba62-84a9f9082c5b', '5d4776d7-61d8-5535-974c-6bed41f7e005', '574ac9d3-6403-5fb2-b6d8-4be95aef196e', 'Bistek Tagalog', null, null, 6),
@@ -523,7 +523,7 @@ insert into public.products (id, store_id, section_id, name, description, badge,
   ('023ee212-cbd1-507a-a0b9-76b886736d2f', '037d0dd2-97e4-5304-9b38-205890f3836f', '35e116b4-3215-5341-8baa-36c977599c96', 'Bagnet Bilao', null, null, 3),
   ('351ca4d2-19f6-52f6-82bc-3f60a66fb483', '037d0dd2-97e4-5304-9b38-205890f3836f', '35e116b4-3215-5341-8baa-36c977599c96', 'Bilao Shanghai', null, null, 4),
   ('5764d920-93cb-5641-9d04-3fc3839376a4', '037d0dd2-97e4-5304-9b38-205890f3836f', 'b966cf5d-e8f7-5bcb-980c-9a3e0cdbdf96', 'Crispy Pata', null, 'new', 1)
-on conflict (id) do nothing;
+on conflict (id) do update set name = excluded.name;
 
 insert into public.product_variants (id, product_id, label, price, addon_price, sort) values
   ('bed56a5d-f855-5d2a-a0cc-56185bcb2a3b', '9b061b07-40e4-56e1-a885-dc188bf5d22a', '10pcs', 348.00, null, 1),

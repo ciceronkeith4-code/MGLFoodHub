@@ -214,7 +214,7 @@ function ProductRow({ product: p, prev, next, reorderable }: { product: Product;
                   size="sm"
                   checked={!v.is_sold_out}
                   aria-label={`${v.label} available`}
-                  title={v.is_sold_out ? 'Sold out — tap to make available' : 'Available — tap to mark sold out'}
+                  title={v.is_sold_out ? 'Sold out. Tap to make available.' : 'Available. Tap to mark sold out.'}
                   onCheckedChange={async (avail) => {
                     cat.patch('variants', v.id, { is_sold_out: !avail })
                     const { error } = await supabase.from('product_variants').update({ is_sold_out: !avail }).eq('id', v.id)

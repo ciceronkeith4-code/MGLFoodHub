@@ -25,7 +25,7 @@ export default function FindOrder() {
     const { data, error } = await supabase.rpc('find_order', { p_order_number: orderNumber.trim(), p_phone: phone })
     setBusy(false)
     if (error) return setError(errorMessage(error))
-    if (!data) return setError("We couldn't find an order with that order number and phone number. Please double-check both.")
+    if (!data) return setError("We couldn't find an order with that order number and phone number. Please check both and try again.")
     navigate(`/track/${data as string}`)
   }
 

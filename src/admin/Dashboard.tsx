@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Banknote, CalendarClock, ChevronLeft, ChevronRight, Phone, ShoppingBag, Smartphone, TrendingUp, XCircle } from 'lucide-react'
+import { Banknote, CalendarClock, ChevronLeft, ChevronRight, Phone, ShieldCheck, ShoppingBag, TrendingUp, XCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type { OrderRow } from '@/lib/types'
 import { addDays, cn, formatDate, formatDateTime, manilaNow, peso, slotLabel, toCents } from '@/lib/utils'
@@ -48,7 +48,7 @@ export default function Dashboard() {
     const monthStart = `${today.slice(0, 8)}01`
     void Promise.all([
       count((q) => q.gte('created_at', `${today}T00:00:00+08:00`)),
-      count((q) => q.eq('payment_method', 'gcash').eq('payment_status', 'pending_verification').eq('order_status', 'processing')),
+      count((q) => q.neq('payment_method', 'cod').eq('payment_status', 'pending_verification').eq('order_status', 'processing')),
       count((q) => q.eq('payment_method', 'cod').eq('order_status', 'processing')),
       count((q) => q.eq('delivery_date', tomorrow).neq('order_status', 'cancelled')),
       count((q) => q.eq('cancel_requested', true)),
@@ -68,11 +68,11 @@ export default function Dashboard() {
   const loading = !stats
   return (
     <div className="space-y-6">
-      <AdminPageHeader title="Dashboard" description="Live — new orders appear here instantly." />
+      <AdminPageHeader title="Dashboard" description="Live. New orders appear here instantly." />
 
       <div className="grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-3 xl:grid-cols-4">
         <StatCard label="New orders today" value={stats?.newToday} icon={<ShoppingBag />} accent="brand" loading={loading} to={`/admin/orders?created=${today}`} />
-        <StatCard label="GCash to verify" value={stats?.gcashToVerify} icon={<Smartphone />} accent="sky" loading={loading} to="/admin/orders?method=gcash&pstatus=pending_verification&status=processing" />
+        <StatCard label="Online payments to verify" value={stats?.gcashToVerify} icon={<ShieldCheck />} accent="sky" loading={loading} to="/admin/orders?method=online&pstatus=pending_verification&status=processing" />
         <StatCard label="COD orders to call" value={stats?.codToCall} icon={<Phone />} accent="amber" loading={loading} to="/admin/orders?method=cod&status=processing" />
         <StatCard label="Scheduled for tomorrow" value={stats?.tomorrow} icon={<CalendarClock />} accent="navy" loading={loading} to={`/admin/orders?date=${tomorrow}`} />
         <StatCard label="Cancellation requests" value={stats?.cancelRequests} icon={<XCircle />} accent="red" loading={loading} to="/admin/orders?status=cancel_requested" />

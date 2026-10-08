@@ -14,6 +14,7 @@ import { Field } from '@/components/ui/label'
 import { RadioCard, RadioGroup, Skeleton } from '@/components/ui/controls'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { EmptyState, ErrorBanner, Lightbox } from '@/components/common'
+import { PaymentLogo } from '@/components/PaymentLogo'
 import { AdminPageHeader, OrderBadges, Panel } from './ui'
 import { useAdminLive } from './AdminLayout'
 
@@ -21,8 +22,8 @@ type Action = 'confirm' | 'mark_paid' | 'reject_payment' | 'preparing' | 'out_fo
 
 const ACTIONS: Record<Action, { title: string; confirm: string; reason?: string; destructive?: boolean; description: string }> = {
   confirm: { title: 'Confirm this COD order?', confirm: 'Confirm Order', description: 'Do this after you have called and confirmed with the customer.' },
-  mark_paid: { title: 'Mark GCash payment as paid?', confirm: 'Mark as Paid', description: 'Only do this after checking the amount and reference number in your GCash app.' },
-  reject_payment: { title: 'Reject this GCash payment?', confirm: 'Reject Payment', reason: 'Reason (shown to the customer)', destructive: true, description: 'The customer will see the reason and can upload a new proof.' },
+  mark_paid: { title: 'Mark payment as paid?', confirm: 'Mark as Paid', description: 'Only do this after checking the amount and reference number in your app.' },
+  reject_payment: { title: 'Reject this payment?', confirm: 'Reject Payment', reason: 'Reason (shown to the customer)', destructive: true, description: 'The customer will see the reason and can upload a new proof.' },
   preparing: { title: 'Mark as Preparing?', confirm: 'Mark Preparing', description: 'The customer will see “Preparing”.' },
   out_for_delivery: { title: 'Mark as Out for Delivery?', confirm: 'Out for Delivery', description: 'The customer will see that the rider is on the way.' },
   delivered: { title: 'Mark as Delivered?', confirm: 'Mark Delivered', description: 'COD orders will also be marked as paid.' },
@@ -98,7 +99,7 @@ export default function OrderDetail() {
       toast.error(errorMessage(error))
       return false
     }
-    toast.success('Order updated — the customer sees it instantly.')
+    toast.success('Order updated. The customer sees it instantly.')
     await load()
     return true
   }
@@ -116,6 +117,8 @@ export default function OrderDetail() {
 
   const o = order
   const isCod = o.payment_method === 'cod'
+  const methodLabel = PAYMENT_METHOD_LABEL[o.payment_method]
+  const refText = o.gcash_reference ? ` and Ref ${o.gcash_reference}` : ''
   const done = o.order_status === 'delivered' || o.order_status === 'cancelled'
   const social = socialUrl(o.social_media)
   const groups = new Map<string, OrderItemRow[]>()
@@ -123,15 +126,15 @@ export default function OrderDetail() {
   const spec =
     pending === 'confirm' && !isCod
       ? {
-          title: 'Confirm this GCash order?',
+          title: `Confirm this ${methodLabel} order?`,
           confirm: 'Confirm Order',
-          description: `This also marks the GCash payment as paid. Only confirm after checking ${peso(o.subtotal)} and Ref ${o.gcash_reference ?? '—'} in your GCash app.`,
+          description: `This also marks the ${methodLabel} payment as paid. Only confirm after checking ${peso(o.subtotal)}${refText} in your ${methodLabel} app.`,
         }
       : pending
         ? ACTIONS[pending]
         : null
 
-  // Confirmation is always shown (both COD and GCash): awaiting → button, otherwise its result.
+  // Confirmation is always shown for every payment method: awaiting → button, otherwise its result.
   const confirmedEntry = history.find((h) => h.status === 'confirmed' || h.status === 'payment_confirmed')
   const awaitingConfirmation = o.order_status === 'processing'
 
@@ -178,7 +181,7 @@ export default function OrderDetail() {
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="space-y-5">
-          {/* Order confirmation — always visible for COD and GCash */}
+          {/* Order confirmation: always visible, for every payment method */}
           <Panel title="Order confirmation">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-navy/65">
@@ -189,7 +192,7 @@ export default function OrderDetail() {
                       ? 'Call the customer first, then confirm the order.'
                       : o.payment_status === 'rejected'
                         ? 'Payment was rejected. Confirm only if the customer has since paid the correct amount.'
-                        : `Check ${peso(o.subtotal)} (Ref ${o.gcash_reference ?? '—'}) in your GCash app, then confirm.`
+                        : `Check ${peso(o.subtotal)}${o.gcash_reference ? ` (Ref ${o.gcash_reference})` : ''} in your ${methodLabel} app, then confirm.`
                     : confirmedEntry
                       ? `Confirmed ${formatDateTime(confirmedEntry.created_at)}${confirmedEntry.changed_by_email ? ` by ${confirmedEntry.changed_by_email}` : ''}.`
                       : 'This order is confirmed.'}
@@ -263,7 +266,7 @@ export default function OrderDetail() {
                 </Button>
               </div>
               {!isCod && o.payment_status === 'rejected' && (
-                <p className="mt-3 text-sm text-navy/65">Payment rejected — waiting for the customer to upload a new proof. Reason: “{o.payment_rejection_reason}”</p>
+                <p className="mt-3 text-sm text-navy/65">Payment rejected. Waiting for the customer to upload a new proof. Reason: “{o.payment_rejection_reason}”</p>
               )}
             </Panel>
           )}
@@ -345,7 +348,7 @@ export default function OrderDetail() {
                         <div className="min-w-0">
                           <p className="font-semibold">
                             {i.quantity}× {i.product_name_snapshot}
-                            {i.variant_label_snapshot !== 'Regular' && <span className="font-normal"> — {i.variant_label_snapshot}</span>}
+                            {i.variant_label_snapshot !== 'Regular' && <span className="font-normal"> · {i.variant_label_snapshot}</span>}
                           </p>
                           <p className="text-xs text-navy/60">
                             {[i.section_name_snapshot, ...i.options_snapshot.map((x) => (x.group === 'Extra Toppings' ? 'Extra toppings' : `${x.group}: ${x.choice}`))]
@@ -388,7 +391,10 @@ export default function OrderDetail() {
         <div className="space-y-5">
           {/* Payment */}
           <Panel title="Payment">
-            <p className="font-semibold">{PAYMENT_METHOD_LABEL[o.payment_method]}</p>
+            <div className="flex items-center gap-3">
+              <PaymentLogo method={o.payment_method} />
+              <p className="font-semibold">{methodLabel}</p>
+            </div>
             {!isCod && (
               <div className="mt-2 space-y-3 text-sm">
                 <div className="flex items-center justify-between gap-2 rounded-xl bg-sky-50 px-3 py-2">
@@ -404,7 +410,7 @@ export default function OrderDetail() {
                 <p>Amount expected: <strong>{peso(o.subtotal)}</strong></p>
                 {proofUrl ? (
                   <button type="button" onClick={() => setProofOpen(true)} className="block w-full overflow-hidden rounded-xl border border-sand-200">
-                    <img src={proofUrl} alt="GCash payment proof" className="max-h-80 w-full object-contain bg-navy-50" />
+                    <img src={proofUrl} alt={`${methodLabel} payment proof`} className="max-h-80 w-full object-contain bg-navy-50" />
                     <span className="block py-1.5 text-center text-xs font-semibold text-brand-600">Tap to zoom</span>
                   </button>
                 ) : (
@@ -516,7 +522,7 @@ export default function OrderDetail() {
       </Dialog>
 
       <CallLogDialog open={callOpen} onOpenChange={setCallOpen} orderId={o.id} onSaved={load} />
-      <Lightbox open={proofOpen} onOpenChange={setProofOpen} src={proofUrl} title={`GCash proof · ${o.order_number}`} />
+      <Lightbox open={proofOpen} onOpenChange={setProofOpen} src={proofUrl} title={`${methodLabel} proof · ${o.order_number}`} />
     </div>
   )
 }

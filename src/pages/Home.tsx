@@ -86,7 +86,7 @@ export default function Home() {
               <span className="text-brand-600">on schedule.</span>
             </h1>
             <p className="mt-5 max-w-md text-[15px] leading-relaxed text-navy/70">
-              Puto, pancit bilao, crispy pata and lutong-bahay ulam from the stores you love. Pick a date, pick a time — we'll handle the rest.
+              Puto, pancit bilao, crispy pata and lutong bahay ulam from the stores you love. Pick a date, pick a time, and we'll handle the rest.
             </p>
 
             {/* Search pill (reference: address input with round arrow button) */}
@@ -119,7 +119,7 @@ export default function Home() {
 
             <div className="mt-6 flex flex-wrap gap-3">
               <Button size="lg" className="w-full px-4 text-[15px] sm:w-auto sm:px-7 sm:text-base" onClick={goToStores}>
-                <CalendarClock /> Order Now – Scheduled Delivery
+                <CalendarClock /> Order Now · Scheduled Delivery
               </Button>
               <Button size="lg" variant="outline" className="w-full border-navy/15 bg-transparent sm:w-auto" asChild>
                 <Link to="/my-orders">Track my order</Link>
@@ -129,7 +129,7 @@ export default function Home() {
             <ul className="mt-8 flex flex-wrap gap-x-7 gap-y-3 text-sm text-navy/80">
               {[
                 { icon: Truck, t: 'Scheduled Delivery' },
-                { icon: Banknote, t: 'COD or GCash' },
+                { icon: Banknote, t: 'COD or Online Payment' },
                 { icon: ShieldCheck, t: 'Private order tracking' },
               ].map(({ icon: Icon, t }) => (
                 <li key={t} className="flex items-center gap-2">
@@ -252,7 +252,7 @@ export default function Home() {
       <section className="mt-10 grid grid-cols-1 gap-4 rounded-[2rem] bg-white/70 p-5 ring-1 ring-sand-200/70 sm:grid-cols-2 sm:p-7 lg:grid-cols-4">
         {[
           { icon: CalendarClock, t: 'Scheduled Delivery', d: 'Book for tomorrow or any day within 30 days.' },
-          { icon: Banknote, t: 'COD or GCash', d: 'Pay cash to the rider or send via GCash.' },
+          { icon: Banknote, t: 'COD or Online Payment', d: 'Pay cash to the rider or send via GCash, MariBank or GoTyme.' },
           { icon: Radio, t: 'Live Order Tracking', d: 'Your own private link shows every update.' },
           { icon: StoreIcon, t: 'One Delivery Fee', d: 'Order from all 13 merchants in one go.' },
         ].map(({ icon: Icon, t, d }) => (

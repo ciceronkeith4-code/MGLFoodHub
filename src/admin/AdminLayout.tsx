@@ -7,6 +7,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import type { OrderRow } from '@/lib/types'
 import { cn, peso, storage } from '@/lib/utils'
+import { PAYMENT_METHOD_LABEL } from '@/lib/orderStatus'
 import { Logo } from '@/components/Logo'
 import { useAdminAuth } from './AdminAuth'
 
@@ -88,7 +89,7 @@ export default function AdminLayout() {
           setUnseen((n) => n + 1)
           if (soundRef.current) chime()
           toast.success(`New order ${o.order_number}`, {
-            description: `${o.customer_name} · ${o.payment_method === 'gcash' ? 'GCash' : 'COD'} · ${peso(o.subtotal)}`,
+            description: `${o.customer_name} · ${o.payment_method === 'cod' ? 'COD' : PAYMENT_METHOD_LABEL[o.payment_method]} · ${peso(o.subtotal)}`,
             action: { label: 'Open', onClick: () => navigate(`/admin/orders/${o.id}`) },
             duration: 10_000,
           })
@@ -105,7 +106,7 @@ export default function AdminLayout() {
             duration: 10_000,
           })
         } else if (h.status === 'proof_resubmitted') {
-          toast.info('A customer re-uploaded a GCash payment proof', {
+          toast.info('A customer sent a new payment proof', {
             action: { label: 'Open', onClick: () => navigate(`/admin/orders/${h.order_id}`) },
           })
         }
@@ -163,7 +164,7 @@ export default function AdminLayout() {
         className="flex w-full items-center gap-2 rounded-full px-4 py-2 hover:bg-sand"
       >
         {sound ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}
-        New-order sound {sound ? 'on' : 'off'}
+        New order sound {sound ? 'on' : 'off'}
       </button>
       <p className="truncate px-4 text-xs text-navy/50">{user?.email}</p>
       <button type="button" onClick={() => void signOut()} className="flex w-full items-center gap-2 rounded-full px-4 py-2 hover:bg-sand">

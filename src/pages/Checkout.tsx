@@ -3,12 +3,14 @@ import { Link, useNavigate } from 'react-router-dom'
 import { DayPicker } from 'react-day-picker'
 import { toast } from 'sonner'
 import {
-  AlertTriangle, Banknote, Check, CalendarDays, Clock, Copy, ImagePlus, Loader2, Lock, MapPin, ShoppingBag, Smartphone, User, Wallet,
+  AlertTriangle, Check, CalendarDays, Clock, Copy, ImagePlus, Loader2, Lock, MapPin, ShoppingBag, User, Wallet,
 } from 'lucide-react'
 import { useCatalog, useCartView } from '@/hooks/useCatalog'
 import { useCart } from '@/store/cart'
 import { supabase, errorMessage } from '@/lib/supabase'
-import type { CheckoutInfo } from '@/lib/types'
+import type { CheckoutInfo, OnlineMethod, PaymentMethod } from '@/lib/types'
+import { ONLINE_METHODS, PAYMENT_METHOD_LABEL, paymentAccount } from '@/lib/orderStatus'
+import { PaymentLogo } from '@/components/PaymentLogo'
 import { computeSlots } from '@/lib/slots'
 import { saveMyOrder } from '@/lib/myOrders'
 import { extOf, prepareImage } from '@/lib/image'
@@ -31,7 +33,7 @@ interface FormState {
   barangay: string
   city: string
   landmark: string
-  payment_method: '' | 'cod' | 'gcash'
+  payment_method: '' | PaymentMethod
   delivery_date: string
   delivery_slot: string
   customer_notes: string
@@ -128,6 +130,9 @@ export default function Checkout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [info, blocked])
 
+  // GCash, MariBank and GoTyme share one flow: pay, then send the reference number + screenshot.
+  const onlineMethod: OnlineMethod | null = form.payment_method && form.payment_method !== 'cod' ? form.payment_method : null
+
   function validate(): Errors {
     const e: Errors = {}
     if (form.customer_name.trim().length < 2) e.customer_name = 'Please enter your full name.'
@@ -140,9 +145,10 @@ export default function Checkout() {
     if (!form.payment_method) e.payment_method = 'Please choose a payment method.'
     if (!form.delivery_date) e.delivery_date = 'Please choose a delivery date.'
     if (!form.delivery_slot) e.delivery_slot = 'Please choose a delivery time slot.'
-    if (form.payment_method === 'gcash') {
-      if (!/^[A-Za-z0-9 -]{4,40}$/.test(form.gcash_reference.trim())) e.gcash_reference = 'Please enter the GCash reference number.'
-      if (!proof) e.proof = 'Please upload a screenshot of your GCash payment.'
+    if (onlineMethod) {
+      const label = PAYMENT_METHOD_LABEL[onlineMethod]
+      if (!/^[A-Za-z0-9 -]{4,40}$/.test(form.gcash_reference.trim())) e.gcash_reference = `Please enter the ${label} reference number.`
+      if (!proof) e.proof = `Please upload a screenshot of your ${label} payment.`
     }
     if (!form.agree) e.agree = 'Please tick this box to continue.'
     return e
@@ -166,14 +172,14 @@ export default function Checkout() {
     setBusy(true)
     try {
       let proofPath: string | null = null
-      if (form.payment_method === 'gcash' && proof) {
+      if (onlineMethod && proof) {
         if (uploaded.current?.file === proof) {
           proofPath = uploaded.current.path
         } else {
           const file = await prepareImage(proof)
           const path = `proofs/${deviceId.replace(/[^A-Za-z0-9_-]/g, '')}/${Date.now()}-${randomId().slice(0, 8)}.${extOf(file)}`
           const { error } = await supabase.storage.from('payment-proofs').upload(path, file, { contentType: file.type, upsert: false })
-          if (error) throw new Error('Could not upload your GCash screenshot. Please try again.')
+          if (error) throw new Error('Could not upload your payment screenshot. Please try again.')
           uploaded.current = { file: proof, path }
           proofPath = path
         }
@@ -192,7 +198,7 @@ export default function Checkout() {
         delivery_date: form.delivery_date,
         delivery_slot: form.delivery_slot,
         payment_method: form.payment_method,
-        gcash_reference: form.payment_method === 'gcash' ? form.gcash_reference.trim() : null,
+        gcash_reference: onlineMethod ? form.gcash_reference.trim() : null,
         gcash_proof_path: proofPath,
         customer_notes: form.customer_notes.trim(),
         agree_terms: form.agree,
@@ -260,18 +266,20 @@ export default function Checkout() {
   }
 
   const total = view.subtotalCents / 100
+  const account = onlineMethod ? paymentAccount(info, onlineMethod) : null
+  const methodLabel = onlineMethod ? PAYMENT_METHOD_LABEL[onlineMethod] : ''
   const blockedCheckout = view.hasIssues || !!slotInfo.conflict
   const stepsDone: [boolean, boolean, boolean] = [
     form.customer_name.trim().length >= 2 && !!normalizePhone(form.phone) && isValidEmail(form.email) && form.social_media.trim().length >= 2 &&
       form.address.trim().length >= 4 && form.barangay.trim().length >= 2 && form.city.trim().length >= 2,
     !!form.delivery_date && !!form.delivery_slot,
-    form.payment_method === 'cod' || (form.payment_method === 'gcash' && form.gcash_reference.trim().length >= 4 && !!proof),
+    form.payment_method === 'cod' || (!!onlineMethod && form.gcash_reference.trim().length >= 4 && !!proof),
   ]
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:py-12">
       <h1 className="font-display text-3xl font-bold sm:text-4xl">Checkout</h1>
-      <p className="mt-1.5 text-sm text-navy/60">Scheduled delivery only — earliest is tomorrow. No account needed.</p>
+      <p className="mt-1.5 text-sm text-navy/60">Scheduled delivery only. The earliest is tomorrow. No account needed.</p>
       <CheckoutSteps done={stepsDone} />
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -354,7 +362,7 @@ export default function Checkout() {
                     />
                   </div>
                   <p className="text-xs text-navy/55">
-                    Same-day delivery isn't available. Orders for tomorrow close at {formatTime(info.cutoff_time)} (PH time).
+                    Same day delivery isn't available. Orders for tomorrow close at {formatTime(info.cutoff_time)} (PH time).
                   </p>
                 </Field>
                 <Field label="Preferred Delivery Time" required error={errors.delivery_slot}>
@@ -371,7 +379,7 @@ export default function Checkout() {
                       </div>
                       {cartStores.length > 1 && slotInfo.window && (
                         <p className="text-xs text-navy/55">
-                          Slots shown are when all {cartStores.length} stores in your cart are open ({formatTime(slotInfo.window.open)} – {formatTime(slotInfo.window.close)}).
+                          Slots shown are when all {cartStores.length} stores in your cart are open ({formatTime(slotInfo.window.open)} to {formatTime(slotInfo.window.close)}).
                         </p>
                       )}
                     </>
@@ -390,38 +398,43 @@ export default function Checkout() {
           <Section step={4} icon={<Wallet />} title="Payment method">
             <RadioGroup value={form.payment_method} onValueChange={(v) => set('payment_method', v as FormState['payment_method'])} className="grid gap-3 sm:grid-cols-2" aria-label="Payment method">
               <RadioCard value="cod">
-                <Banknote className="size-6 text-emerald-600" />
-                <span>
+                <PaymentLogo method="cod" />
+                <span className="min-w-0">
                   <span className="block font-semibold">Cash on Delivery</span>
                   <span className="block text-xs text-navy/60">We'll call you to confirm</span>
                 </span>
               </RadioCard>
-              <RadioCard value="gcash">
-                <Smartphone className="size-6 text-sky-600" />
-                <span>
-                  <span className="block font-semibold">GCash</span>
-                  <span className="block text-xs text-navy/60">Pay now, upload proof</span>
-                </span>
-              </RadioCard>
+              {ONLINE_METHODS.map((m) => (
+                <RadioCard key={m} value={m}>
+                  <PaymentLogo method={m} />
+                  <span className="min-w-0">
+                    <span className="block font-semibold">{PAYMENT_METHOD_LABEL[m]}</span>
+                    <span className="block text-xs text-navy/60">Pay now, upload proof</span>
+                  </span>
+                </RadioCard>
+              ))}
             </RadioGroup>
             {errors.payment_method && <p className="mt-2 text-xs font-medium text-brand-red" data-field-error="true">{errors.payment_method}</p>}
 
-            {form.payment_method === 'gcash' && info && (
+            {onlineMethod && account && info && (
               <div className="mt-4 space-y-4 rounded-2xl border-2 border-sky-200 bg-sky-50/60 p-4 animate-fade-up">
                 <div className="flex flex-col gap-4 sm:flex-row">
-                  {info.gcash_qr_url ? (
-                    <img src={info.gcash_qr_url} alt="GCash QR code" className="mx-auto size-44 shrink-0 rounded-xl border border-sky-200 bg-white object-contain p-1 sm:mx-0" />
+                  {account.qr_url ? (
+                    <img src={account.qr_url} alt={`${methodLabel} QR code`} className="mx-auto size-44 shrink-0 rounded-xl border border-sky-200 bg-white object-contain p-1 sm:mx-0" />
                   ) : null}
-                  <div className="flex-1 space-y-2 text-sm">
-                    <p className="font-heading font-bold">Send your payment via GCash</p>
+                  <div className="min-w-0 flex-1 space-y-2 text-sm">
+                    <div className="flex items-center gap-3">
+                      <PaymentLogo method={onlineMethod} />
+                      <p className="font-heading font-bold">Send your payment via {methodLabel}</p>
+                    </div>
                     <dl className="space-y-1">
-                      <div className="flex justify-between gap-2"><dt className="text-navy/60">Account name</dt><dd className="font-semibold">{info.gcash_account_name || '—'}</dd></div>
+                      <div className="flex justify-between gap-2"><dt className="text-navy/60">Account name</dt><dd className="min-w-0 break-words text-right font-semibold">{account.account_name || 'Not set yet'}</dd></div>
                       <div className="flex items-center justify-between gap-2">
-                        <dt className="text-navy/60">GCash number</dt>
+                        <dt className="text-navy/60">{methodLabel} number</dt>
                         <dd className="flex items-center gap-1 font-semibold tabular-nums">
-                          {info.gcash_number || '—'}
-                          {info.gcash_number && (
-                            <button type="button" className="rounded p-1 hover:bg-sky-100" aria-label="Copy GCash number" onClick={async () => (await copyText(info.gcash_number)) && toast.success('GCash number copied')}>
+                          {account.number || 'Not set yet'}
+                          {account.number && (
+                            <button type="button" className="rounded p-1 hover:bg-sky-100" aria-label={`Copy ${methodLabel} number`} onClick={async () => (await copyText(account.number)) && toast.success(`${methodLabel} number copied`)}>
                               <Copy className="size-3.5" />
                             </button>
                           )}
@@ -432,7 +445,7 @@ export default function Checkout() {
                     <p className="text-xs text-navy/60">Food subtotal only. The delivery fee is paid to the rider.</p>
                   </div>
                 </div>
-                <Field label="GCash Reference No." htmlFor="ref" required error={errors.gcash_reference}>
+                <Field label={`${methodLabel} Reference No.`} htmlFor="ref" required error={errors.gcash_reference}>
                   <Input id="ref" inputMode="numeric" value={form.gcash_reference} onChange={(e) => set('gcash_reference', e.target.value)} aria-invalid={!!errors.gcash_reference} placeholder="e.g. 1234 567 890123" />
                 </Field>
                 <Field label="Payment screenshot" required error={errors.proof}>
@@ -481,7 +494,7 @@ export default function Checkout() {
             <label className="flex cursor-pointer gap-3 text-sm">
               <Checkbox checked={form.agree} onCheckedChange={(v) => set('agree', v === true)} aria-invalid={!!errors.agree} className="mt-0.5" />
               <span>
-                I understand that delivery fees may be higher for long-distance deliveries and that the quality of some food items may not be the same as in-store.
+                I understand that delivery fees may be higher for long distance deliveries and that the quality of some food items may not be the same as in store.
                 <span className="text-brand-red"> *</span>
               </span>
             </label>

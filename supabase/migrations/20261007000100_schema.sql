@@ -8,8 +8,11 @@ create extension if not exists pgcrypto with schema extensions;
 -- Enums
 -- ---------------------------------------------------------------------
 do $$ begin
-  create type public.payment_method as enum ('cod', 'gcash');
+  create type public.payment_method as enum ('cod', 'gcash', 'maribank', 'gotyme');
 exception when duplicate_object then null; end $$;
+-- Databases created before MariBank and GoTyme were added.
+alter type public.payment_method add value if not exists 'maribank';
+alter type public.payment_method add value if not exists 'gotyme';
 
 do $$ begin
   create type public.payment_status as enum ('cod_unpaid', 'pending_verification', 'paid', 'rejected');
@@ -196,6 +199,12 @@ insert into public.settings (key, value) values
   ('gcash_account_name', '""'::jsonb),
   ('gcash_number', '""'::jsonb),
   ('gcash_qr_url', '""'::jsonb),
+  ('maribank_account_name', '""'::jsonb),
+  ('maribank_number', '""'::jsonb),
+  ('maribank_qr_url', '""'::jsonb),
+  ('gotyme_account_name', '""'::jsonb),
+  ('gotyme_number', '""'::jsonb),
+  ('gotyme_qr_url', '""'::jsonb),
   ('cutoff_time', '"20:00"'::jsonb),
   ('max_days_ahead', '30'::jsonb),
   ('blocked_dates', '[]'::jsonb),
@@ -204,13 +213,23 @@ insert into public.settings (key, value) values
   ('max_orders_per_phone_per_day', '5'::jsonb),
   ('ordering_guidelines', jsonb_build_array(
     'We deliver via Grab within Metro Manila from 12:00 PM to 6:00 PM.',
-    'Pay by Cash on Delivery (COD) or online (GCash).',
-    'Orders are for booking (scheduled delivery) only. Same-day delivery is not available.',
+    'Pay by Cash on Delivery (COD) or online via GCash, MariBank or GoTyme.',
+    'Orders are for booking (scheduled delivery) only. Same day delivery is not available.',
     'We will confirm your order by text or call.',
     'Menu prices are VAT inclusive and may vary or be subject to change by the merchant. Higher delivery fees may also apply for long distance deliveries.',
     'You can order from all merchants in the app and pay only one delivery fee.'
   ))
 on conflict (key) do nothing;
+
+-- Existing databases: update the two default guidelines that changed (custom ones are kept).
+update public.settings
+   set value = (
+     select coalesce(jsonb_agg(case g
+         when 'Pay by Cash on Delivery (COD) or online (GCash).' then 'Pay by Cash on Delivery (COD) or online via GCash, MariBank or GoTyme.'
+         when 'Orders are for booking (scheduled delivery) only. Same-day delivery is not available.' then 'Orders are for booking (scheduled delivery) only. Same day delivery is not available.'
+         else g end order by n), '[]'::jsonb)
+     from jsonb_array_elements_text(value) with ordinality as t(g, n))
+ where key = 'ordering_guidelines' and jsonb_typeof(value) = 'array';
 
 -- ---------------------------------------------------------------------
 -- Helpers

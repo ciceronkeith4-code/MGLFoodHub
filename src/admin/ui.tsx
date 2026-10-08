@@ -54,12 +54,21 @@ export function StatCard({
   return to ? <Link to={to}>{body}</Link> : body
 }
 
+const ONLINE_STATUS_SHORT: Record<OrderRow['payment_status'], string> = {
+  cod_unpaid: 'unpaid',
+  pending_verification: 'to verify',
+  paid: 'paid',
+  rejected: 'rejected',
+}
+
 export function OrderBadges({ order, className }: { order: Pick<OrderRow, 'order_status' | 'payment_status' | 'payment_method' | 'cancel_requested'>; className?: string }) {
   return (
     <div className={cn('flex flex-wrap gap-1', className)}>
       <ToneBadge tone={ORDER_STATUS_TONE[order.order_status]}>{ORDER_STATUS_LABEL[order.order_status]}</ToneBadge>
       <ToneBadge tone={PAYMENT_STATUS_TONE[order.payment_status]}>
-        {order.payment_method === 'cod' && order.payment_status !== 'paid' ? PAYMENT_METHOD_LABEL.cod : PAYMENT_STATUS_LABEL[order.payment_status]}
+        {order.payment_method === 'cod'
+          ? order.payment_status === 'paid' ? PAYMENT_STATUS_LABEL.paid : PAYMENT_METHOD_LABEL.cod
+          : `${PAYMENT_METHOD_LABEL[order.payment_method]} ${ONLINE_STATUS_SHORT[order.payment_status]}`}
       </ToneBadge>
       {order.cancel_requested && <ToneBadge tone="danger">Cancel requested</ToneBadge>}
     </div>

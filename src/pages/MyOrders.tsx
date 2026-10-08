@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { ChevronRight, ClipboardList, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { getMyOrders, removeMyOrder, type SavedOrder } from '@/lib/myOrders'
-import { ORDER_STATUS_LABEL, ORDER_STATUS_TONE, PAYMENT_STATUS_LABEL } from '@/lib/orderStatus'
+import { ORDER_STATUS_LABEL, ORDER_STATUS_TONE, PAYMENT_METHOD_LABEL, PAYMENT_STATUS_LABEL } from '@/lib/orderStatus'
 import type { OrderSummary } from '@/lib/types'
 import { formatDate, peso, slotLabel } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -61,7 +61,7 @@ export default function MyOrders() {
                         </p>
                         <div className="flex flex-wrap gap-1.5">
                           <ToneBadge tone={ORDER_STATUS_TONE[o.order_status]}>{ORDER_STATUS_LABEL[o.order_status]}</ToneBadge>
-                          {o.payment_method === 'gcash' && <ToneBadge tone="neutral">{PAYMENT_STATUS_LABEL[o.payment_status]}</ToneBadge>}
+                          {o.payment_method !== 'cod' && <ToneBadge tone="neutral">{PAYMENT_METHOD_LABEL[o.payment_method]} · {PAYMENT_STATUS_LABEL[o.payment_status]}</ToneBadge>}
                         </div>
                       </>
                     ) : (

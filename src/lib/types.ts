@@ -1,5 +1,7 @@
 export type Badge = 'best_seller' | 'new' | 'all_time_favorite'
-export type PaymentMethod = 'cod' | 'gcash'
+/** Online payments (reference number + screenshot, verified by the admin). */
+export type OnlineMethod = 'gcash' | 'maribank' | 'gotyme'
+export type PaymentMethod = 'cod' | OnlineMethod
 export type PaymentStatus = 'cod_unpaid' | 'pending_verification' | 'paid' | 'rejected'
 export type OrderStatus = 'processing' | 'confirmed' | 'preparing' | 'out_for_delivery' | 'delivered' | 'cancelled'
 
@@ -135,6 +137,12 @@ export interface OrderSummary {
   created_at: string
 }
 
+export interface PaymentAccount {
+  account_name: string
+  number: string
+  qr_url: string
+}
+
 export interface CheckoutInfo {
   today: string
   min_date: string
@@ -144,6 +152,8 @@ export interface CheckoutInfo {
   gcash_account_name: string
   gcash_number: string
   gcash_qr_url: string
+  /** Account details per online payment method (missing on databases not yet updated). */
+  payment_accounts?: Partial<Record<OnlineMethod, PaymentAccount>>
   delivery_fee_note: string
   email_notifications_enabled: boolean
   ordering_guidelines?: string[]

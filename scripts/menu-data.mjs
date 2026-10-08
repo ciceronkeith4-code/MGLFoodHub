@@ -63,7 +63,7 @@ Tinumis = 132
 Kare Kare = 192
 
 STORE okoy-ni-jay-r | Okoy ni Jay R! | merienda-street-food | 07:30-20:00
-tagline: Crispy on the outside, Loaded with Sarap inside! – Made with love para sa'yo!
+tagline: Crispy on the outside, Loaded with Sarap inside! Made with love para sa'yo!
 note: For orders, message Jay R-D Original Okoy
 ## Okoy
 Regular Okoy = 72 ; ~Mejo manipis at bilang lang ang hipon.
@@ -494,9 +494,9 @@ Breaded Fish Fillet (6pcs) = 330
 Sweet & Sour Fish Fillet = 330
 Fish Fillet with Tofu & Tausi = 390 ; #best_seller
 ## Filipino Favorites
-Judy Ann's Kare-Kare – Goto = 632
+Judy Ann's Kare-Kare (Goto) = 632
 Lechon Kare-Kare = 672 ; #best_seller
-Judy Ann's Kare-Kare – Mix = 768
+Judy Ann's Kare-Kare (Mix) = 768
 Sinigang na Baboy = 546
 Pork Sisig (6pcs) = 462
 Bistek Tagalog = 546
